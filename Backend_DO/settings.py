@@ -176,7 +176,7 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'gadigitaloperations@gmail.com'
 EMAIL_HOST_PASSWORD = 'qdgrupjtradsdxbk'
-DEFAULT_FROM_EMAIL = 'HireSync <no-reply@hiresync.com>'
+DEFAULT_FROM_EMAIL = 'GA Digital Operations <no-reply@gadigitaloperations.com>'
 FRONTEND_URL = 'http://localhost:5173'
 # Use seconds; default is 259200 (3 days)
 PASSWORD_RESET_TIMEOUT = 60 * 60 * 24 * 7  # e.g., 7 days

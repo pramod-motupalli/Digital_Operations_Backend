@@ -2,6 +2,8 @@ from rest_framework import serializers
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from .models import CustomUser, ClientProfile
+from rest_framework import serializers
+from django.contrib.auth import get_user_model
 
 # Registration serializer
 from rest_framework import serializers
@@ -80,3 +82,32 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
             del fields['username']
 
         return fields
+
+User = get_user_model()
+
+class ResetPasswordSerializer(serializers.Serializer):
+    uuid = serializers.UUIDField()
+    new_password = serializers.CharField(min_length=8, write_only=True)
+    confirm_password = serializers.CharField(min_length=8, write_only=True)
+
+    def validate(self, attrs):
+        if attrs["new_password"] != attrs["confirm_password"]:
+            raise serializers.ValidationError("Passwords do not match.")
+        return attrs
+
+    def save(self):
+        uuid = self.validated_data["uuid"]
+        new_password = self.validated_data["new_password"]
+
+        # Look up the user
+        try:
+            user = User.objects.get(email_verification_uuid=uuid)
+        except User.DoesNotExist:
+            raise serializers.ValidationError("Invalid or expired reset link.")
+
+        # Set and save
+        user.set_password(new_password)
+        user.email_verification_uuid = None
+        user.is_active = True
+        user.save()
+        return user
