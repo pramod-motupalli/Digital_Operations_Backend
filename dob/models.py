@@ -26,7 +26,7 @@ class CustomUser(AbstractUser):
     # In your CustomUser model
     is_email_verified = models.BooleanField(default=False)
     email_verification_token = models.CharField(max_length=64, blank=True, null=True)
-    email_verification_uuid = models.UUIDField(default=uuid.uuid4)
+    email_verification_uuid = models.UUIDField(default=uuid.uuid4, unique=True, null=True, blank=True)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default=ROLE_CLIENT)
     manager = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='subordinates')
     team_lead = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='team_members')

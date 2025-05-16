@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <style>
+      .button {
+        display: inline-block;
+        padding: 12px 24px;
+        margin: 20px 0;
+        font-size: 16px;
+        color: #ffffff;
+        background-color: #1a73e8;
+        text-decoration: none;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <p>Hi {{ user.first_name }},</p>
+    <p>Thanks for signing up! Please verify your email by clicking the button below:</p>
+    <a href="{{ verification_url }}" class="button">Verify Email</a>
+    <p>If the button doesn’t work, copy and paste this link into your browser:</p>
+    <p><small>{{ verification_url }}</small></p>
+    <p>– Your Company Name</p>
+  </body>
+</html>

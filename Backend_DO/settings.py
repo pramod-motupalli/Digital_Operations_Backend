@@ -170,7 +170,7 @@ DEBUG = True
 
 
 # settings.py
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'  # e.g., smtp.gmail.com
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
@@ -184,3 +184,12 @@ PASSWORD_RESET_TIMEOUT = 60 * 60 * 24 * 7  # e.g., 7 days
 
 # Frontend base URL for redirects
 FRONTEND_BASE_URL = "http://localhost:5173"
+
+
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=5),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    # ... other settings
+}
