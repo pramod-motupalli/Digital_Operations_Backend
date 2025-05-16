@@ -1,6 +1,6 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
-
+import uuid
 class CustomUser(AbstractUser):
     ROLE_CLIENT      = 'client'
     ROLE_MANAGER     = 'manager'
@@ -18,10 +18,15 @@ class CustomUser(AbstractUser):
         (ROLE_TEAM_MEMBER, 'Team Member'),
     ]
 
+    
     email = models.EmailField(unique=True)
     username = models.CharField(max_length=150, unique=True)
     first_name = models.CharField(max_length=30, blank=True)   
     last_name = models.CharField(max_length=30, blank=True)   
+    # In your CustomUser model
+    is_email_verified = models.BooleanField(default=False)
+    email_verification_token = models.CharField(max_length=64, blank=True, null=True)
+    email_verification_uuid = models.UUIDField(default=uuid.uuid4)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default=ROLE_CLIENT)
     manager = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='subordinates')
     team_lead = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='team_members')
