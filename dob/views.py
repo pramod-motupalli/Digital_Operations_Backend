@@ -46,15 +46,29 @@ class RegisterClientView(APIView):
         }, status=status.HTTP_201_CREATED)
 
 class VerifyEmailView(APIView):
-    permission_classes = []
+    permission_classes = [AllowAny]
 
-    def get(self, request, uuid):
-        user = get_object_or_404(CustomUser, email_verification_uuid=uuid)
+    def post(self, request):
+        email = request.data.get("email")
+        if not email:
+            return Response({"error": "Email is required"}, status=400)
+
+        user = get_object_or_404(CustomUser, email=email)
+
+        # Check if user has a pending UUID (not yet verified)
+        if not user.email_verification_uuid:
+            return Response({"error": "Email already verified or no verification pending."}, status=400)
+
+        # Mark user verified & active, clear UUID
         user.is_email_verified = True
         user.is_active = True
         user.email_verification_uuid = None
         user.save()
-        return redirect(f"{settings.FRONTEND_URL}/client")
+
+        # Optionally return success message instead of redirect
+        return Response({"message": "Email verified successfully."}, status=200)
+
+        # return redirect(f"{settings.FRONTEND_URL}/client")
 
 class ResendVerificationView(APIView):
     def post(self, request):
@@ -77,22 +91,38 @@ class SendVerificationEmailView(APIView):
             return Response({"error": "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         user = get_object_or_404(CustomUser, email=email)
-        uuid_str = str(user.email_verification_uuid)
-        path = reverse('verify_email', kwargs={'uuid': uuid_str})
-        verification_url = request.build_absolute_uri(path)
 
-        send_mail(
-            subject="Please verify your email",
-            message=(
-                f"Hello {user.first_name},\n\n"
-                f"Click the link below to verify your email address:\n\n"
-                f"{verification_url}\n\n"
-                "If you did not request this, please ignore this email."
-            ),
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[user.email],
-            fail_silently=False,
-        )
+        # Ensure email_verification_uuid exists
+        if not user.email_verification_uuid:
+            user.email_verification_uuid = uuid.uuid4()
+            user.save()
+        if user.is_email_verified:
+             return Response({"message": "Email already verified."}, status=status.HTTP_200_OK)
+
+        # uuid_str = str(user.email_verification_uuid)
+
+        # try:
+        #     path = reverse('verify_email', kwargs={'uuid': uuid_str})
+        # except Exception as e:
+        #     return Response({"error": f"URL reverse error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # verification_url = request.build_absolute_uri(path)
+
+        try:
+            send_mail(
+                subject="Please verify your email",
+                message=(
+                    f"Hello {user.first_name},\n\n"
+                    f"Click the link below to verify your email address:\n\n"
+                    f"{settings.FRONTEND_URL}/identity\n\n"
+                    "If you did not request this, please ignore this email."
+                ),
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email],
+                fail_silently=False,
+            )
+        except Exception as e:
+            return Response({"error": f"Failed to send email: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return Response({"message": "Verification email sent."}, status=status.HTTP_200_OK)
 
@@ -157,11 +187,11 @@ class ResetPasswordView(APIView):
 
     def post(self, request):
         serializer = ResetPasswordSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {"detail": "Password has been reset successfully."},
+                status=status.HTTP_200_OK
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        serializer.save()
-        return Response(
-            {"detail": "Password has been reset successfully."},
-            status=status.HTTP_200_OK
-        )

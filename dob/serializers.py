@@ -86,7 +86,7 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
 User = get_user_model()
 
 class ResetPasswordSerializer(serializers.Serializer):
-    uuid = serializers.UUIDField()
+    email = serializers.EmailField()
     new_password = serializers.CharField(min_length=8, write_only=True)
     confirm_password = serializers.CharField(min_length=8, write_only=True)
 
@@ -96,18 +96,17 @@ class ResetPasswordSerializer(serializers.Serializer):
         return attrs
 
     def save(self):
-        uuid = self.validated_data["uuid"]
+        email = self.validated_data["email"]
         new_password = self.validated_data["new_password"]
 
-        # Look up the user
         try:
-            user = User.objects.get(email_verification_uuid=uuid)
-        except User.DoesNotExist:
-            raise serializers.ValidationError("Invalid or expired reset link.")
+            user = CustomUser.objects.get(email=email)
+        except CustomUser.DoesNotExist:
+            raise serializers.ValidationError("No user found with this email.")
 
-        # Set and save
         user.set_password(new_password)
-        user.email_verification_uuid = None
-        user.is_active = True
+        user.email_verification_uuid = None  # Optionally clear verification UUID
+        user.is_active = True  # Optionally activate user
         user.save()
         return user
+
