@@ -23,7 +23,6 @@ class CustomUser(AbstractUser):
     username = models.CharField(max_length=150, unique=True)
     first_name = models.CharField(max_length=30, blank=True)   
     last_name = models.CharField(max_length=30, blank=True)   
-    # In your CustomUser model
     is_email_verified = models.BooleanField(default=False)
     email_verification_token = models.CharField(max_length=64, blank=True, null=True)
     email_verification_uuid = models.UUIDField(default=uuid.uuid4, unique=True, null=True, blank=True)
@@ -42,16 +41,47 @@ class ClientProfile(models.Model):
     def __str__(self):
         return f"ClientProfile({self.user.username})"
 
-class SPOCProfile(models.Model):
-    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='spoc_profile')
-    department = models.CharField(max_length=100)
+class ManagerProfile(models.Model):
+    user = models.OneToOneField(
+        CustomUser,
+        on_delete=models.CASCADE,
+        related_name='manager_profile',
+        # limit_choices_to={'role': CustomUser.ROLE_MANAGER}
+    )
+    parent = models.CharField(max_length=100,default="Null",null=True)
+    
 
     def __str__(self):
-        return f"SPOCProfile({self.user.username})"
+        return f"ManagerProfile({self.user.username})"
+
+class TeamLeadProfile(models.Model):
+    user = models.OneToOneField(
+        CustomUser,
+        on_delete=models.CASCADE,
+        related_name='teamlead_profile',
+        primary_key=True  # Set user as primary key
+    )
+    designation = models.CharField(max_length=100, default="teamlead")
+    is_spoc = models.BooleanField(default=False)
+    parent = models.ForeignKey(ManagerProfile, on_delete=models.SET_NULL, null=True)  # The manager who created the Team Lead
+
+    def __str__(self):
+        return f"TeamLeadProfile({self.user.username})"
+
+
+
+class StaffProfile(models.Model):
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, primary_key=True)
+    designation = models.TextField(blank=True)
+    team_lead = models.ForeignKey(TeamLeadProfile, on_delete=models.SET_NULL, null=True)  # The team lead assigned to this staff
+
+    def __str__(self):
+        return f"StaffProfile({self.user.username})"
+
 
 class AccountantProfile(models.Model):
-    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='accountant_profile')
-    certification = models.CharField(max_length=100, blank=True)
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
+    parent=models.ForeignKey(ManagerProfile, on_delete=models.SET_NULL, null=True)
 
     def __str__(self):
         return f"AccountantProfile({self.user.username})"

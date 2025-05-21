@@ -1,6 +1,6 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework import status,generics
 from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -10,7 +10,7 @@ from django.urls import reverse
 from django.conf import settings
 from django.shortcuts import redirect, get_object_or_404
 from dob.models import CustomUser
-from .serializers import ClientRegistrationSerializer, MyTokenObtainPairSerializer, ResetPasswordSerializer
+from .serializers import ClientRegistrationSerializer, MyTokenObtainPairSerializer, ResetPasswordSerializer,TeamLeadRegistrationSerializer,ManagerProfileSerializer,StaffRegistrationSerializer,AccountantRegistrationSerializer
 from .emails import send_email_verification_link
 import uuid
 
@@ -20,9 +20,13 @@ class MyTokenObtainPairView(TokenObtainPairView):
     serializer_class = MyTokenObtainPairSerializer
     def validate(self, attrs):
         data = super().validate(attrs)
+        # print(data)
         # `self.user` is the authenticated user instance
         data['role'] = self.user.role
+        data['is_email_verified'] = self.user.is_email_verified
+        # print(self.user.is_email_verified)
         return data
+
 
 class RegisterClientView(APIView):
     permission_classes = [AllowAny]
@@ -43,6 +47,68 @@ class RegisterClientView(APIView):
             "message": "Client registered successfully. Please verify your email.",
             "access_token": access_token,
             "refresh_token": refresh_token,
+        }, status=status.HTTP_201_CREATED)
+    
+class RegisterTeamLeadView(APIView):
+    permission_classes = []
+
+    def post(self, request):
+        serializer = TeamLeadRegistrationSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        teamlead_profile = serializer.save()
+
+        return Response({
+            "message": "Team lead created successfully.",
+            "username": teamlead_profile.user.username,
+            "email": teamlead_profile.user.email
+        }, status=status.HTTP_201_CREATED)
+
+
+# class IsSuperUser(permissions.BasePermission):
+#     def has_permission(self, request, view):
+#         return request.user and request.user.is_superuser
+
+class ManagerCreateView(generics.CreateAPIView):
+    queryset = CustomUser.objects.filter(role=CustomUser.ROLE_MANAGER)
+    serializer_class = ManagerProfileSerializer
+    permission_classes = []
+
+
+
+class RegisterStaffView(APIView):
+    permission_classes = []
+
+    def post(self, request):
+        serializer = StaffRegistrationSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        staff_profile = serializer.save()
+
+        return Response({
+            "message": "Staff registered successfully.",
+            "username": staff_profile.user.username,
+            "email": staff_profile.user.email,
+            "team_lead": staff_profile.team_lead.user.username
+        }, status=status.HTTP_201_CREATED)
+
+class RegisterAccountantView(APIView):
+    permission_classes = []
+
+    def post(self, request):
+        serializer = AccountantRegistrationSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        accountant_profile = serializer.save()
+
+        return Response({
+            "message": "Accountant registered successfully.",
+            "username": accountant_profile.user.username,
+            "email": accountant_profile.user.email,
+            "manager": accountant_profile.parent.user.username
         }, status=status.HTTP_201_CREATED)
 
 class VerifyEmailView(APIView):
@@ -98,15 +164,6 @@ class SendVerificationEmailView(APIView):
             user.save()
         if user.is_email_verified:
              return Response({"message": "Email already verified."}, status=status.HTTP_200_OK)
-
-        # uuid_str = str(user.email_verification_uuid)
-
-        # try:
-        #     path = reverse('verify_email', kwargs={'uuid': uuid_str})
-        # except Exception as e:
-        #     return Response({"error": f"URL reverse error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        # verification_url = request.build_absolute_uri(path)
 
         try:
             send_mail(
