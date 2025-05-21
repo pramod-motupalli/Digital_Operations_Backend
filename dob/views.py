@@ -9,6 +9,7 @@ from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.conf import settings
 from django.shortcuts import redirect, get_object_or_404
+from django.http import JsonResponse
 from dob.models import CustomUser
 from .serializers import ClientRegistrationSerializer, MyTokenObtainPairSerializer, ResetPasswordSerializer,TeamLeadRegistrationSerializer,ManagerProfileSerializer,StaffRegistrationSerializer,AccountantRegistrationSerializer
 from .emails import send_email_verification_link
@@ -94,6 +95,59 @@ class RegisterStaffView(APIView):
             "team_lead": staff_profile.team_lead.user.username
         }, status=status.HTTP_201_CREATED)
 
+
+class StaffAutoRegisterView(APIView):
+    permission_classes = []
+
+    def post(self, request):
+        data = request.data.copy()
+
+        # Required fields
+        name = data.get('name')
+        email = data.get('email')
+        designation = data.get('designation')
+        team_lead_username = data.get('team_lead') or data.get('teamLead')
+
+
+        if not all([name, email, designation, team_lead_username]):
+            return Response({'error': 'Missing required fields.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Split name into first and last
+        name_parts = name.strip().split()
+        first_name = name_parts[0]
+        last_name = " ".join(name_parts[1:]) if len(name_parts) > 1 else ""
+
+        # Generate unique username
+        base_username = name.replace(" ", "").lower()
+        existing_count = CustomUser.objects.filter(username__startswith=base_username).count()
+        username = f"{base_username}{existing_count + 1 if existing_count else ''}"
+
+        # Set password
+        password = f"staff{existing_count + 1 if existing_count else 1}"
+
+        # Populate data for serializer
+        data = {
+            'email': email,
+            'username': username,
+            'first_name': first_name,
+            'last_name': last_name,
+            'password': password,
+            'designation': designation,
+            'team_lead_username': team_lead_username
+        }
+
+        serializer = StaffRegistrationSerializer(data=data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                'message': 'Staff registered successfully.',
+                'username': username,
+                'password': password
+            }, status=status.HTTP_201_CREATED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
 class RegisterAccountantView(APIView):
     permission_classes = []
 
@@ -115,23 +169,24 @@ class VerifyEmailView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        email = request.data.get("email")
-        if not email:
-            return Response({"error": "Email is required"}, status=400)
+        uuid = request.data.get("uuid")
+        if not uuid:
+            return Response({"error": "UUID is required."}, status=400)
 
-        user = get_object_or_404(CustomUser, email=email)
+        try:
+            user = CustomUser.objects.get(email_verification_uuid=uuid)
+        except CustomUser.DoesNotExist:
+            return Response({"error": "Invalid or expired verification link."}, status=400)
 
-        # Check if user has a pending UUID (not yet verified)
-        if not user.email_verification_uuid:
-            return Response({"error": "Email already verified or no verification pending."}, status=400)
+        if user.is_email_verified:
+            return Response({"message": "Email already verified."}, status=200)
 
-        # Mark user verified & active, clear UUID
+        # Mark user as verified and active
         user.is_email_verified = True
         user.is_active = True
         user.email_verification_uuid = None
         user.save()
 
-        # Optionally return success message instead of redirect
         return Response({"message": "Email verified successfully."}, status=200)
 
         # return redirect(f"{settings.FRONTEND_URL}/client")
@@ -150,7 +205,7 @@ class ResendVerificationView(APIView):
 
 class SendVerificationEmailView(APIView):
     permission_classes = [AllowAny]
-
+    
     def post(self, request):
         email = request.data.get('email')
         if not email:
@@ -163,7 +218,9 @@ class SendVerificationEmailView(APIView):
             user.email_verification_uuid = uuid.uuid4()
             user.save()
         if user.is_email_verified:
-             return Response({"message": "Email already verified."}, status=status.HTTP_200_OK)
+            return Response({"message": "Email already verified."}, status=status.HTTP_200_OK)
+
+        verification_link = f"{settings.FRONTEND_URL}/identity?uuid={user.email_verification_uuid}"
 
         try:
             send_mail(
@@ -171,7 +228,7 @@ class SendVerificationEmailView(APIView):
                 message=(
                     f"Hello {user.first_name},\n\n"
                     f"Click the link below to verify your email address:\n\n"
-                    f"{settings.FRONTEND_URL}/identity\n\n"
+                    f"{verification_link}\n\n"
                     "If you did not request this, please ignore this email."
                 ),
                 from_email=settings.DEFAULT_FROM_EMAIL,
@@ -182,7 +239,6 @@ class SendVerificationEmailView(APIView):
             return Response({"error": f"Failed to send email: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return Response({"message": "Verification email sent."}, status=status.HTTP_200_OK)
-
 
 class SendResetPasswordEmailView(APIView):
     permission_classes = [AllowAny]
@@ -196,47 +252,55 @@ class SendResetPasswordEmailView(APIView):
         # 2. Lookup user
         user = get_object_or_404(CustomUser, email=email)
 
-        # 3. Generate & save a new UUID if none exists
-        if not user.email_verification_uuid:
-            user.email_verification_uuid = uuid.uuid4()
-            user.save()
+        # 3. Generate & save a new UUID
+        user.email_verification_uuid = uuid.uuid4()
+        user.save()
 
-        # 4. Reverse the URL with matching name & kwarg
-        path = reverse(
-            "verify_password",
-            kwargs={"uuid": str(user.email_verification_uuid)}
-        )
-        verification_url = request.build_absolute_uri(path)
+        # 4. Build the full verification URL
+        reset_path = reverse("verify_password", kwargs={"uuid": str(user.email_verification_uuid)})
+        verification_url = request.build_absolute_uri(reset_path)
 
         # 5. Send the verification email
-        send_mail(
-            subject="Password Reset Verification",
-            message=(
-                f"Hello {user.first_name},\n\n"
-                f"Click here to reset your password:\n{verification_url}\n\n"
-                "If you didn’t request this, ignore this email."
-            ),
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[user.email],
-            fail_silently=False,
-        )
+        try:
+            send_mail(
+                subject="Password Reset Verification",
+                message=(
+                    f"Hello {user.first_name},\n\n"
+                    f"Click the link below to reset your password:\n\n"
+                    f"{verification_url}\n\n"
+                    "If you didn’t request this, you can ignore this email."
+                ),
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email],
+                fail_silently=False,
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to send email: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
         return Response(
             {"message": "Verification email sent."},
             status=status.HTTP_200_OK
         )
 
+
 class VerifyForgotPasswordEmailView(APIView):
-    permission_classes = []
+    permission_classes = [AllowAny]
 
     def get(self, request, uuid):
-        user = get_object_or_404(CustomUser, email_verification_uuid=uuid)
+        try:
+            user = CustomUser.objects.get(email_verification_uuid=uuid)
+        except CustomUser.DoesNotExist:
+            return redirect(f"{settings.FRONTEND_URL}/invalid-link")  # optional: handle invalid case in frontend
+
         user.is_email_verified = True
         user.is_active = True
         user.email_verification_uuid = None
         user.save()
+
         return redirect(f"{settings.FRONTEND_URL}/reset-password")
-    
 
 
 class ResetPasswordView(APIView):
@@ -251,4 +315,10 @@ class ResetPasswordView(APIView):
                 status=status.HTTP_200_OK
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+def team_leads_list(request):
+    if request.method == 'GET':
+        leads = CustomUser.objects.filter(role='team_lead').values_list('username', flat=True)
+        return JsonResponse(list(leads), safe=False)
 

@@ -11,7 +11,9 @@ from .views import (
     SendVerificationEmailView,
     ManagerCreateView,
     RegisterStaffView,
-    RegisterAccountantView
+    StaffAutoRegisterView,
+    RegisterAccountantView,
+    team_leads_list,
 )   
 from rest_framework_simplejwt.views import TokenRefreshView
 
@@ -26,7 +28,9 @@ urlpatterns = [
     path('verify-password/<uuid:uuid>/', VerifyForgotPasswordEmailView.as_view(), name='verify_password'),
     path('reset-password/',ResetPasswordView.as_view(),name="reset_password"),
     path('register-team-lead/', RegisterTeamLeadView.as_view(), name='register_teamlead'),
-     path('register-accountant/', RegisterAccountantView.as_view(), name='register-accountant'),
+    path('register-accountant/', RegisterAccountantView.as_view(), name='register-accountant'),
     path('create-manager/', ManagerCreateView.as_view(), name='create-manager'),
     path('create-staff/', RegisterStaffView.as_view(), name='create-staff'),
+    path('register-staff/', StaffAutoRegisterView.as_view(), name='regester-staff'),
+     path("team-leads/", team_leads_list, name="team-leads-list"),
 ]
