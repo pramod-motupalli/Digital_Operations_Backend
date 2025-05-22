@@ -1,11 +1,15 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate, get_user_model
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from .models import CustomUser, ClientProfile, TeamLeadProfile, StaffProfile, AccountantProfile,ManagerProfile
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
-CustomUser = get_user_model()
-User = get_user_model()
 
+from .models import (
+    CustomUser, ClientProfile, TeamLeadProfile, StaffProfile,
+    AccountantProfile, ManagerProfile, Plan, DomainHosting,
+    PlanRequest, PaymentRequest
+)
+
+CustomUser = get_user_model()
 
 # 1️⃣ Client Registration Serializer
 class ClientRegistrationSerializer(serializers.ModelSerializer):
@@ -34,6 +38,8 @@ class ClientRegistrationSerializer(serializers.ModelSerializer):
 
         return user
 
+
+# 2️⃣ Manager Registration Serializer
 class ManagerProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
@@ -41,26 +47,25 @@ class ManagerProfileSerializer(serializers.ModelSerializer):
         extra_kwargs = {'password': {'write_only': True}}
 
     def create(self, validated_data):
-        validated_data.pop('user', None)  # since you're creating user below
         user = CustomUser.objects.create_user(
             **validated_data,
-            role=CustomUser.ROLE_MANAGER,
+            role=CustomUser.ROLE_MANAGER
         )
         user.is_active = False
         user.save()
 
-        # Create ManagerProfile for the user
         ManagerProfile.objects.create(user=user)
         return user
 
 
+# 3️⃣ Team Lead Registration Serializer
 class TeamLeadRegistrationSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(write_only=True)
     username = serializers.CharField(write_only=True)
     first_name = serializers.CharField(write_only=True)
     last_name = serializers.CharField(write_only=True)
     password = serializers.CharField(write_only=True)
-    manager_email = serializers.CharField(write_only=True)  # Accept manager username
+    manager_email = serializers.CharField(write_only=True)
 
     class Meta:
         model = TeamLeadProfile
@@ -73,21 +78,17 @@ class TeamLeadRegistrationSerializer(serializers.ModelSerializer):
         manager_email = validated_data.pop('manager_email')
 
         try:
-            # Get the manager user with the specified username and role
             manager_user = CustomUser.objects.get(email=manager_email, role=CustomUser.ROLE_MANAGER)
-            # Get the manager profile related to that user
             manager_profile = manager_user.manager_profile
         except (CustomUser.DoesNotExist, ManagerProfile.DoesNotExist):
-            raise serializers.ValidationError({'manager_username': 'Manager not found or invalid role.'})
+            raise serializers.ValidationError({'manager_email': 'Manager not found or invalid role.'})
 
-        # Extract user creation fields from validated_data
         email = validated_data.pop('email')
         username = validated_data.pop('username')
         first_name = validated_data.pop('first_name')
         last_name = validated_data.pop('last_name')
         password = validated_data.pop('password')
 
-        # Create the Team Lead user with the role TEAM_LEAD
         user = CustomUser.objects.create_user(
             email=email,
             username=username,
@@ -96,10 +97,9 @@ class TeamLeadRegistrationSerializer(serializers.ModelSerializer):
             password=password,
             role=CustomUser.ROLE_TEAM_LEAD
         )
-        user.is_active = False  # Set inactive initially
+        user.is_active = False
         user.save()
 
-        # Create and return the TeamLeadProfile linking the user and the manager profile
         return TeamLeadProfile.objects.create(
             user=user,
             parent=manager_profile,
@@ -107,13 +107,14 @@ class TeamLeadRegistrationSerializer(serializers.ModelSerializer):
         )
 
 
+# 4️⃣ Staff Registration Serializer
 class StaffRegistrationSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(write_only=True)
     username = serializers.CharField(write_only=True)
     first_name = serializers.CharField(write_only=True)
     last_name = serializers.CharField(write_only=True)
     password = serializers.CharField(write_only=True)
-    team_lead_username = serializers.CharField(write_only=True)  #  link via username
+    team_lead_username = serializers.CharField(write_only=True)
 
     class Meta:
         model = StaffProfile
@@ -131,21 +132,19 @@ class StaffRegistrationSerializer(serializers.ModelSerializer):
         except (CustomUser.DoesNotExist, TeamLeadProfile.DoesNotExist):
             raise serializers.ValidationError({'team_lead_username': 'Team lead not found or invalid role.'})
 
-        # Extract CustomUser fields
         email = validated_data.pop('email')
         username = validated_data.pop('username')
         first_name = validated_data.pop('first_name')
         last_name = validated_data.pop('last_name')
         password = validated_data.pop('password')
 
-        # Create CustomUser with STAFF role
         user = CustomUser.objects.create_user(
             email=email,
             username=username,
             first_name=first_name,
             last_name=last_name,
             password=password,
-            role=CustomUser.ROLE_TEAM_MEMBER  # or ROLE_STAFF if defined
+            role=CustomUser.ROLE_TEAM_MEMBER
         )
         user.is_active = False
         user.save()
@@ -155,15 +154,16 @@ class StaffRegistrationSerializer(serializers.ModelSerializer):
             team_lead=team_lead_profile,
             **validated_data
         )
-    
 
+
+# 5️⃣ Accountant Registration Serializer
 class AccountantRegistrationSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(write_only=True)
     username = serializers.CharField(write_only=True)
     first_name = serializers.CharField(write_only=True)
     last_name = serializers.CharField(write_only=True)
     password = serializers.CharField(write_only=True)
-    parent_username = serializers.CharField(write_only=True)  # Manager's username
+    parent_username = serializers.CharField(write_only=True)
 
     class Meta:
         model = AccountantProfile
@@ -177,11 +177,10 @@ class AccountantRegistrationSerializer(serializers.ModelSerializer):
 
         try:
             manager_user = CustomUser.objects.get(username=parent_username, role=CustomUser.ROLE_MANAGER)
-            managerprofile = manager_user.manager_profile
+            manager_profile = manager_user.manager_profile
         except (CustomUser.DoesNotExist, ManagerProfile.DoesNotExist):
             raise serializers.ValidationError({'parent_username': 'Manager not found or invalid role.'})
 
-        # Create user
         user = CustomUser.objects.create_user(
             email=validated_data.pop('email'),
             username=validated_data.pop('username'),
@@ -195,34 +194,11 @@ class AccountantRegistrationSerializer(serializers.ModelSerializer):
 
         return AccountantProfile.objects.create(
             user=user,
-            parent=managerprofile
+            parent=manager_profile
         )
 
 
-
-class TokenRefreshSerializer(serializers.Serializer):
-    refresh = serializers.CharField()
-
-    def validate(self, attrs):
-        self.refresh = attrs['refresh']
-
-        try:
-            refresh_token = RefreshToken(self.refresh)
-            data = {
-                'access': str(refresh_token.access_token),
-            }
-            # Optionally, you can rotate the refresh token here:
-            # refresh_token.blacklist()  # if you use blacklist app
-            # data['refresh'] = str(refresh_token)
-            return data
-
-        except TokenError as e:
-            raise serializers.ValidationError('Refresh token is invalid or expired')
-
-
-
-
-# 3️⃣ Token (JWT) Serializer with Email Login
+# 6️⃣ JWT Token Serializer (Email-based Login)
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
     username_field = 'email'
 
@@ -261,7 +237,20 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
         return fields
 
 
-# 4️⃣ Reset Password Serializer
+# 7️⃣ Refresh Token Serializer
+class TokenRefreshSerializer(serializers.Serializer):
+    refresh = serializers.CharField()
+
+    def validate(self, attrs):
+        self.refresh = attrs['refresh']
+        try:
+            refresh_token = RefreshToken(self.refresh)
+            return {'access': str(refresh_token.access_token)}
+        except TokenError:
+            raise serializers.ValidationError('Refresh token is invalid or expired')
+
+
+# 8️⃣ Password Reset Serializer
 class ResetPasswordSerializer(serializers.Serializer):
     new_password = serializers.CharField(min_length=8, write_only=True)
     confirm_password = serializers.CharField(min_length=8, write_only=True)
@@ -281,3 +270,62 @@ class ResetPasswordSerializer(serializers.Serializer):
         user.is_active = True
         user.save()
         return user
+
+
+# 9️⃣ Plan Serializer
+class PlanSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Plan
+        fields = '__all__'
+
+
+# 🔟 Domain Hosting Serializer
+class DomainHostingSerializer(serializers.ModelSerializer):
+    plan = PlanSerializer()
+
+    class Meta:
+        model = DomainHosting
+        fields = '__all__'
+        extra_kwargs = {
+            'domain_expiry': {'required': False, 'allow_null': True},
+            'hosting_expiry': {'required': False, 'allow_null': True},
+        }
+
+
+# 1️⃣1️⃣ Plan Request Serializer
+class PlanRequestSerializer(serializers.ModelSerializer):
+    client_name = serializers.SerializerMethodField()
+    client_email = serializers.SerializerMethodField()
+    client_phone = serializers.SerializerMethodField()
+    plan_title = serializers.CharField(source='plan.title')
+    plan_price = serializers.SerializerMethodField()
+    plan_features = serializers.JSONField(source='plan.features')
+
+    def get_client_name(self, obj):
+        return obj.client.username if obj.client else 'Unknown'
+
+    def get_client_email(self, obj):
+        return obj.client.email if obj.client else 'N/A'
+
+    def get_client_phone(self, obj):
+        try:
+            return obj.client.client_profile.contact_number
+        except:
+            return 'N/A'
+
+    def get_plan_price(self, obj):
+        return obj.get_price()
+
+    class Meta:
+        model = PlanRequest
+        fields = [
+            'id', 'client_name', 'client_email', 'client_phone',
+            'plan_title', 'plan_price', 'plan_features', 'overridden_price'
+        ]
+
+
+# 1️⃣2️⃣ Payment Request Serializer
+class PaymentRequestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PaymentRequest
+        fields = '__all__'

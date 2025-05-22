@@ -1,8 +1,9 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status,generics
-from rest_framework.permissions import AllowAny,IsAuthenticated
-from rest_framework_simplejwt.views import TokenObtainPairView,TokenRefreshView
+from rest_framework import status, generics, viewsets, permissions
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.core.mail import send_mail
 from django.contrib.auth import get_user_model
@@ -10,23 +11,34 @@ from django.urls import reverse
 from django.conf import settings
 from django.shortcuts import redirect, get_object_or_404
 from django.http import JsonResponse
-from dob.models import CustomUser
-from .serializers import ClientRegistrationSerializer, TokenRefreshSerializer ,MyTokenObtainPairSerializer, ResetPasswordSerializer,TeamLeadRegistrationSerializer,ManagerProfileSerializer,StaffRegistrationSerializer,AccountantRegistrationSerializer
+from dob.models import CustomUser, Plan, DomainHosting, PlanRequest, PaymentRequest
+from .serializers import (
+    ClientRegistrationSerializer,
+    TokenRefreshSerializer,
+    MyTokenObtainPairSerializer,
+    ResetPasswordSerializer,
+    TeamLeadRegistrationSerializer,
+    ManagerProfileSerializer,
+    StaffRegistrationSerializer,
+    AccountantRegistrationSerializer,
+    PlanSerializer,
+    DomainHostingSerializer,
+    PlanRequestSerializer,
+    PaymentRequestSerializer
+)
 from .emails import send_email_verification_link
-# from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 import uuid
 
 User = get_user_model()
 
+
 class MyTokenObtainPairView(TokenObtainPairView):
     serializer_class = MyTokenObtainPairSerializer
+
     def validate(self, attrs):
         data = super().validate(attrs)
-        # print(data)
-        # `self.user` is the authenticated user instance
         data['role'] = self.user.role
         data['is_email_verified'] = self.user.is_email_verified
-        # print(self.user.is_email_verified)
         return data
 
 
@@ -34,11 +46,9 @@ class TokenRefreshView(TokenRefreshView):
     serializer_class = TokenRefreshSerializer
 
     def post(self, request, *args, **kwargs):
-        # Optional: Add logging or custom pre-processing here
         print("Token refresh requested")
-        response = super().post(request, *args, **kwargs)
-        # Optional: Modify response data here if needed
-        return response
+        return super().post(request, *args, **kwargs)
+
 
 class UserMeView(APIView):
     permission_classes = [IsAuthenticated]
@@ -52,6 +62,7 @@ class UserMeView(APIView):
             "name": user.get_full_name(),
         })
 
+
 class RegisterClientView(APIView):
     permission_classes = [AllowAny]
 
@@ -64,15 +75,13 @@ class RegisterClientView(APIView):
         send_email_verification_link(user, signup=True, role='client')
 
         refresh = RefreshToken.for_user(user)
-        access_token = str(refresh.access_token)
-        refresh_token = str(refresh)
-
         return Response({
             "message": "Client registered successfully. Please verify your email.",
-            "access_token": access_token,
-            "refresh_token": refresh_token,
+            "access_token": str(refresh.access_token),
+            "refresh_token": str(refresh),
         }, status=status.HTTP_201_CREATED)
-    
+
+
 class RegisterTeamLeadView(APIView):
     permission_classes = []
 
@@ -82,7 +91,6 @@ class RegisterTeamLeadView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         teamlead_profile = serializer.save()
-
         return Response({
             "message": "Team lead created successfully.",
             "username": teamlead_profile.user.username,
@@ -90,15 +98,10 @@ class RegisterTeamLeadView(APIView):
         }, status=status.HTTP_201_CREATED)
 
 
-# class IsSuperUser(permissions.BasePermission):
-#     def has_permission(self, request, view):
-#         return request.user and request.user.is_superuser
-
 class ManagerCreateView(generics.CreateAPIView):
     queryset = CustomUser.objects.filter(role=CustomUser.ROLE_MANAGER)
     serializer_class = ManagerProfileSerializer
     permission_classes = []
-
 
 
 class RegisterStaffView(APIView):
@@ -110,7 +113,6 @@ class RegisterStaffView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         staff_profile = serializer.save()
-
         return Response({
             "message": "Staff registered successfully.",
             "username": staff_profile.user.username,
@@ -125,30 +127,22 @@ class StaffAutoRegisterView(APIView):
     def post(self, request):
         data = request.data.copy()
 
-        # Required fields
         name = data.get('name')
         email = data.get('email')
         designation = data.get('designation')
         team_lead_username = data.get('team_lead') or data.get('teamLead')
 
-
         if not all([name, email, designation, team_lead_username]):
             return Response({'error': 'Missing required fields.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Split name into first and last
         name_parts = name.strip().split()
         first_name = name_parts[0]
         last_name = " ".join(name_parts[1:]) if len(name_parts) > 1 else ""
-
-        # Generate unique username
         base_username = name.replace(" ", "").lower()
         existing_count = CustomUser.objects.filter(username__startswith=base_username).count()
         username = f"{base_username}{existing_count + 1 if existing_count else ''}"
-
-        # Set password
         password = f"staff{existing_count + 1 if existing_count else 1}"
 
-        # Populate data for serializer
         data = {
             'email': email,
             'username': username,
@@ -162,8 +156,6 @@ class StaffAutoRegisterView(APIView):
         serializer = StaffRegistrationSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
-
-            # ✅ Send email to the staff member
             try:
                 send_mail(
                     subject='Your Staff Account Credentials',
@@ -189,7 +181,6 @@ class StaffAutoRegisterView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-
 class RegisterAccountantView(APIView):
     permission_classes = []
 
@@ -199,7 +190,6 @@ class RegisterAccountantView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         accountant_profile = serializer.save()
-
         return Response({
             "message": "Accountant registered successfully.",
             "username": accountant_profile.user.username,
@@ -207,23 +197,23 @@ class RegisterAccountantView(APIView):
             "manager": accountant_profile.parent.user.username
         }, status=status.HTTP_201_CREATED)
 
+
 class VerifyEmailView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        uuid = request.data.get("uuid")
-        if not uuid:
+        uuid_str = request.data.get("uuid")
+        if not uuid_str:
             return Response({"error": "UUID is required."}, status=400)
 
         try:
-            user = CustomUser.objects.get(email_verification_uuid=uuid)
+            user = CustomUser.objects.get(email_verification_uuid=uuid_str)
         except CustomUser.DoesNotExist:
             return Response({"error": "Invalid or expired verification link."}, status=400)
 
         if user.is_email_verified:
             return Response({"message": "Email already verified."}, status=200)
 
-        # Mark user as verified and active
         user.is_email_verified = True
         user.is_active = True
         user.email_verification_uuid = None
@@ -231,7 +221,6 @@ class VerifyEmailView(APIView):
 
         return Response({"message": "Email verified successfully."}, status=200)
 
-        # return redirect(f"{settings.FRONTEND_URL}/client")
 
 class ResendVerificationView(APIView):
     def post(self, request):
@@ -245,9 +234,10 @@ class ResendVerificationView(APIView):
         except User.DoesNotExist:
             return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
 
+
 class SendVerificationEmailView(APIView):
     permission_classes = [AllowAny]
-    
+
     def post(self, request):
         email = request.data.get('email')
         if not email:
@@ -255,7 +245,6 @@ class SendVerificationEmailView(APIView):
 
         user = get_object_or_404(CustomUser, email=email)
 
-        # Ensure email_verification_uuid exists
         if not user.email_verification_uuid:
             user.email_verification_uuid = uuid.uuid4()
             user.save()
@@ -278,31 +267,26 @@ class SendVerificationEmailView(APIView):
                 fail_silently=False,
             )
         except Exception as e:
-            return Response({"error": f"Failed to send email: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"error": f"Failed to send email: {str(e)}"}, status=500)
 
-        return Response({"message": "Verification email sent."}, status=status.HTTP_200_OK)
+        return Response({"message": "Verification email sent."}, status=200)
+
 
 class SendResetPasswordEmailView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        # 1. Validate incoming email
         email = request.data.get('email')
         if not email:
-            return Response({"error": "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Email is required"}, status=400)
 
-        # 2. Lookup user
         user = get_object_or_404(CustomUser, email=email)
-
-        # 3. Generate & save a new UUID
         user.email_verification_uuid = uuid.uuid4()
         user.save()
 
-        # 4. Build the full verification URL
         reset_path = reverse("verify_password", kwargs={"uuid": str(user.email_verification_uuid)})
         verification_url = request.build_absolute_uri(reset_path)
 
-        # 5. Send the verification email
         try:
             send_mail(
                 subject="Password Reset Verification",
@@ -317,15 +301,9 @@ class SendResetPasswordEmailView(APIView):
                 fail_silently=False,
             )
         except Exception as e:
-            return Response(
-                {"error": f"Failed to send email: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"error": f"Failed to send email: {str(e)}"}, status=500)
 
-        return Response(
-            {"message": "Verification email sent."},
-            status=status.HTTP_200_OK
-        )
+        return Response({"message": "Verification email sent."}, status=200)
 
 
 class VerifyForgotPasswordEmailView(APIView):
@@ -335,7 +313,7 @@ class VerifyForgotPasswordEmailView(APIView):
         try:
             user = CustomUser.objects.get(email_verification_uuid=uuid)
         except CustomUser.DoesNotExist:
-            return redirect(f"{settings.FRONTEND_URL}/invalid-link")  # optional: handle invalid case in frontend
+            return redirect(f"{settings.FRONTEND_URL}/invalid-link")
 
         user.is_email_verified = True
         user.is_active = True
@@ -346,21 +324,102 @@ class VerifyForgotPasswordEmailView(APIView):
 
 
 class ResetPasswordView(APIView):
-    permission_classes = [IsAuthenticated]  # Require valid token
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         serializer = ResetPasswordSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             serializer.save()
-            return Response(
-                {"detail": "Password has been reset successfully."},
-                status=status.HTTP_200_OK
-            )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "Password has been reset successfully."}, status=200)
+        return Response(serializer.errors, status=400)
 
 
+@api_view(['GET'])
 def team_leads_list(request):
-    if request.method == 'GET':
-        leads = CustomUser.objects.filter(role='team_lead').values_list('username', flat=True)
-        return JsonResponse(list(leads), safe=False)
+    leads = CustomUser.objects.filter(role='team_lead').values_list('username', flat=True)
+    return JsonResponse(list(leads), safe=False)
 
+
+class SubmissionView(APIView):
+    permission_classes = []  
+
+    def get(self, request):
+        domain_hostings = DomainHosting.objects.all()
+        serializer = DomainHostingSerializer(domain_hostings, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        try:
+            title = request.data.get('title')
+            billing = request.data.get('billing')
+            features = request.data.get('features')
+            price = request.data.get('price')
+            domain_hosting = request.data.get('domain_hosting')
+
+            plan = Plan.objects.create(
+                title=title,
+                price=price,
+                billing=billing,
+                features=features
+            )
+
+            if title.lower() == "plan customization":
+                PlanRequest.objects.create(plan=plan)
+
+            domain = None
+            if domain_hosting:
+                domain = DomainHosting.objects.create(
+                    plan=plan,
+                    domain_name=domain_hosting.get('domainName', ''),
+                    domain_provider=domain_hosting.get('domainProvider', ''),
+                    domain_account=domain_hosting.get('domainAccount', ''),
+                    domain_expiry=domain_hosting.get('domainExpiry'),
+                    hosting_provider=domain_hosting.get('hostingProvider', ''),
+                    hosting_provider_name=domain_hosting.get('hostingProviderName', ''),
+                    hosting_expiry=domain_hosting.get('hostingExpiry'),
+                    client_name=domain_hosting.get('clientName'),
+                    phone_number=domain_hosting.get('phoneNumber'),
+                    email=domain_hosting.get('email'),
+                    assigned_to=domain_hosting.get('assignedTo'),
+                )
+
+            return Response({
+                'message': 'Submission successful',
+                'plan_id': plan.id,
+                'domain_id': domain.id if domain else None
+            }, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET', 'PATCH'])
+@permission_classes([AllowAny]) #change permissions
+def get_or_update_requests(request):
+    if request.method == 'GET':
+        requests = PlanRequest.objects.all()
+        serializer = PlanRequestSerializer(requests, many=True)
+        return Response(serializer.data)
+
+    if request.method == 'PATCH':
+        req_id = request.data.get('id')
+        new_price = request.data.get('price')
+
+        if not req_id or new_price is None:
+            return Response({'error': 'Invalid data'}, status=400)
+
+        try:
+            req = PlanRequest.objects.get(id=req_id)
+            req.overridden_price = new_price
+            req.save()
+            return Response({'message': 'Price updated'})
+        except PlanRequest.DoesNotExist:
+            return Response({'error': 'Request not found'}, status=404)
+
+
+class PaymentRequestViewSet(viewsets.ModelViewSet):
+    permission_classes=[AllowAny]
+    queryset = PaymentRequest.objects.all()
+    serializer_class = PaymentRequestSerializer

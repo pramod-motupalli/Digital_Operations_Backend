@@ -1,6 +1,9 @@
-from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.contrib.auth.models import AbstractUser
 import uuid
+
+# ------------------- Custom User and Role Models -------------------
+
 class CustomUser(AbstractUser):
     ROLE_CLIENT      = 'client'
     ROLE_MANAGER     = 'manager'
@@ -10,19 +13,18 @@ class CustomUser(AbstractUser):
     ROLE_TEAM_MEMBER = 'team_member'
 
     ROLE_CHOICES = [
-        (ROLE_CLIENT,      'Client'),
-        (ROLE_MANAGER,     'Manager'),
-        (ROLE_TEAM_LEAD,   'Team Lead'),
-        (ROLE_SPOC,        'SPOC'),
-        (ROLE_ACCOUNTANT,  'Accountant'),
+        (ROLE_CLIENT, 'Client'),
+        (ROLE_MANAGER, 'Manager'),
+        (ROLE_TEAM_LEAD, 'Team Lead'),
+        (ROLE_SPOC, 'SPOC'),
+        (ROLE_ACCOUNTANT, 'Accountant'),
         (ROLE_TEAM_MEMBER, 'Team Member'),
     ]
 
-    
     email = models.EmailField(unique=True)
     username = models.CharField(max_length=150, unique=True)
-    first_name = models.CharField(max_length=30, blank=True)   
-    last_name = models.CharField(max_length=30, blank=True)   
+    first_name = models.CharField(max_length=30, blank=True)
+    last_name = models.CharField(max_length=30, blank=True)
     is_email_verified = models.BooleanField(default=False)
     email_verification_token = models.CharField(max_length=64, blank=True, null=True)
     email_verification_uuid = models.UUIDField(default=uuid.uuid4, unique=True, null=True, blank=True)
@@ -33,6 +35,7 @@ class CustomUser(AbstractUser):
     def __str__(self):
         return f"{self.username} ({self.get_role_display()})"
 
+
 class ClientProfile(models.Model):
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='client_profile')
     company_name = models.CharField(max_length=255)
@@ -41,39 +44,29 @@ class ClientProfile(models.Model):
     def __str__(self):
         return f"ClientProfile({self.user.username})"
 
+
 class ManagerProfile(models.Model):
-    user = models.OneToOneField(
-        CustomUser,
-        on_delete=models.CASCADE,
-        related_name='manager_profile',
-        # limit_choices_to={'role': CustomUser.ROLE_MANAGER}
-    )
-    parent = models.CharField(max_length=100,default="Null",null=True)
-    
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='manager_profile')
+    parent = models.CharField(max_length=100, default="Null", null=True)
 
     def __str__(self):
         return f"ManagerProfile({self.user.username})"
 
+
 class TeamLeadProfile(models.Model):
-    user = models.OneToOneField(
-        CustomUser,
-        on_delete=models.CASCADE,
-        related_name='teamlead_profile',
-        primary_key=True  # Set user as primary key
-    )
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='teamlead_profile', primary_key=True)
     designation = models.CharField(max_length=100, default="teamlead")
     is_spoc = models.BooleanField(default=False)
-    parent = models.ForeignKey(ManagerProfile, on_delete=models.SET_NULL, null=True)  # The manager who created the Team Lead
+    parent = models.ForeignKey(ManagerProfile, on_delete=models.SET_NULL, null=True)
 
     def __str__(self):
         return f"TeamLeadProfile({self.user.username})"
 
 
-
 class StaffProfile(models.Model):
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, primary_key=True)
     designation = models.TextField(blank=True)
-    team_lead = models.ForeignKey(TeamLeadProfile, on_delete=models.SET_NULL, null=True)  # The team lead assigned to this staff
+    team_lead = models.ForeignKey(TeamLeadProfile, on_delete=models.SET_NULL, null=True)
 
     def __str__(self):
         return f"StaffProfile({self.user.username})"
@@ -81,10 +74,11 @@ class StaffProfile(models.Model):
 
 class AccountantProfile(models.Model):
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
-    parent=models.ForeignKey(ManagerProfile, on_delete=models.SET_NULL, null=True)
+    parent = models.ForeignKey(ManagerProfile, on_delete=models.SET_NULL, null=True)
 
     def __str__(self):
         return f"AccountantProfile({self.user.username})"
+
 
 class Team(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -93,6 +87,7 @@ class Team(models.Model):
 
     def __str__(self):
         return self.name
+
 
 class TeamMembership(models.Model):
     team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name='memberships')
@@ -104,36 +99,62 @@ class TeamMembership(models.Model):
     def __str__(self):
         return f"{self.member.username} in {self.team.name}"
 
+# ------------------- Plan & Domain Integration (updated for CustomUser) -------------------
+
 class Plan(models.Model):
-    name = models.CharField(max_length=100, unique=True)
-    description = models.TextField(blank=True)
-    price = models.DecimalField(max_digits=10, decimal_places=2)
-    duration_days = models.PositiveIntegerField()
-    created_at = models.DateTimeField(auto_now_add=True)
+    title = models.CharField(max_length=100)
+    price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    billing = models.CharField(max_length=10, choices=[('monthly', 'Monthly'), ('yearly', 'Yearly')])
+    features = models.JSONField()
+    payment_status = models.CharField(
+        max_length=20,
+        choices=[('Pending', 'Pending'), ('Done', 'Done'), ('Failed', 'Failed')],
+        default='Done'
+    )
 
     def __str__(self):
-        return f"{self.name} - ${self.price} / {self.duration_days} days"
+        return f"{self.title} ({self.payment_status})"
 
-class ClientPlan(models.Model):
-    client = models.ForeignKey(ClientProfile, on_delete=models.CASCADE, related_name='plans')
-    plan = models.ForeignKey(Plan, on_delete=models.CASCADE, related_name='client_plans')
-    start_date = models.DateField()
-    end_date = models.DateField()
+
+class DomainHosting(models.Model):
+    plan = models.ForeignKey(Plan, on_delete=models.CASCADE, related_name='domain_hostings')
+    client_name = models.CharField(max_length=100, blank=True, null=True)
+    phone_number = models.CharField(max_length=20, blank=True, null=True)
+    email = models.EmailField(blank=True, null=True)
+    assigned_to = models.CharField(max_length=100, blank=True, null=True)
+    domain_name = models.CharField(max_length=100, blank=True, null=True)
+    domain_provider = models.CharField(max_length=100, blank=True, null=True)
+    domain_account = models.CharField(max_length=100, blank=True, null=True)
+    domain_expiry = models.DateField(blank=True, null=True)
+    hosting_provider = models.CharField(max_length=100, blank=True, null=True)
+    hosting_provider_name = models.CharField(max_length=100, blank=True, null=True)
+    hosting_expiry = models.DateField(blank=True, null=True)
+
+
+class Accountant(models.Model):
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
     is_active = models.BooleanField(default=True)
 
-    class Meta:
-        unique_together = ('client', 'plan')
+    def __str__(self):
+        return self.user.username
+
+
+class PlanRequest(models.Model):
+    plan = models.ForeignKey(Plan, on_delete=models.CASCADE)
+    client = models.ForeignKey(CustomUser, null=True, blank=True, on_delete=models.SET_NULL, related_name='client_requests')
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    is_approved = models.BooleanField(null=True)
+    reviewed_by = models.ForeignKey(Accountant, null=True, blank=True, on_delete=models.SET_NULL)
+    overridden_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+
+    def get_price(self):
+        return self.overridden_price if self.overridden_price is not None else self.plan.price
 
     def __str__(self):
-        return f"{self.client.user.username} - {self.plan.name}"
+        return f"Request for {self.plan.title} by {self.client.username if self.client else 'Unknown'}"
 
-class Website(models.Model):
-    client = models.ForeignKey(ClientProfile, on_delete=models.CASCADE, related_name='websites')
-    url = models.URLField(unique=True)
-    host_provider = models.CharField(max_length=255)
-    expiry_date = models.DateField()
+
+class PaymentRequest(models.Model):
+    plan_request = models.ForeignKey(PlanRequest, on_delete=models.CASCADE, related_name='payment_requests')
+    price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return f"Website({self.url}) for {self.client.user.username}"
