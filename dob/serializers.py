@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth import authenticate, get_user_model
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from .models import CustomUser, ClientProfile, TeamLeadProfile, StaffProfile, AccountantProfile,ManagerProfile
-
+from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 CustomUser = get_user_model()
 User = get_user_model()
 
@@ -200,6 +200,27 @@ class AccountantRegistrationSerializer(serializers.ModelSerializer):
 
 
 
+class TokenRefreshSerializer(serializers.Serializer):
+    refresh = serializers.CharField()
+
+    def validate(self, attrs):
+        self.refresh = attrs['refresh']
+
+        try:
+            refresh_token = RefreshToken(self.refresh)
+            data = {
+                'access': str(refresh_token.access_token),
+            }
+            # Optionally, you can rotate the refresh token here:
+            # refresh_token.blacklist()  # if you use blacklist app
+            # data['refresh'] = str(refresh_token)
+            return data
+
+        except TokenError as e:
+            raise serializers.ValidationError('Refresh token is invalid or expired')
+
+
+
 
 # 3️⃣ Token (JWT) Serializer with Email Login
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -242,7 +263,6 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
 
 # 4️⃣ Reset Password Serializer
 class ResetPasswordSerializer(serializers.Serializer):
-    email = serializers.EmailField()
     new_password = serializers.CharField(min_length=8, write_only=True)
     confirm_password = serializers.CharField(min_length=8, write_only=True)
 
@@ -252,14 +272,10 @@ class ResetPasswordSerializer(serializers.Serializer):
         return attrs
 
     def save(self):
-        email = self.validated_data["email"]
+        request = self.context.get("request")
+        user = request.user
+
         new_password = self.validated_data["new_password"]
-
-        try:
-            user = CustomUser.objects.get(email=email)
-        except CustomUser.DoesNotExist:
-            raise serializers.ValidationError("No user found with this email.")
-
         user.set_password(new_password)
         user.email_verification_uuid = None
         user.is_active = True

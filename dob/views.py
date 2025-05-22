@@ -1,8 +1,8 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status,generics
-from rest_framework.permissions import AllowAny
-from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework.permissions import AllowAny,IsAuthenticated
+from rest_framework_simplejwt.views import TokenObtainPairView,TokenRefreshView
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.core.mail import send_mail
 from django.contrib.auth import get_user_model
@@ -11,8 +11,9 @@ from django.conf import settings
 from django.shortcuts import redirect, get_object_or_404
 from django.http import JsonResponse
 from dob.models import CustomUser
-from .serializers import ClientRegistrationSerializer, MyTokenObtainPairSerializer, ResetPasswordSerializer,TeamLeadRegistrationSerializer,ManagerProfileSerializer,StaffRegistrationSerializer,AccountantRegistrationSerializer
+from .serializers import ClientRegistrationSerializer, TokenRefreshSerializer ,MyTokenObtainPairSerializer, ResetPasswordSerializer,TeamLeadRegistrationSerializer,ManagerProfileSerializer,StaffRegistrationSerializer,AccountantRegistrationSerializer
 from .emails import send_email_verification_link
+# from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 import uuid
 
 User = get_user_model()
@@ -28,6 +29,28 @@ class MyTokenObtainPairView(TokenObtainPairView):
         # print(self.user.is_email_verified)
         return data
 
+
+class TokenRefreshView(TokenRefreshView):
+    serializer_class = TokenRefreshSerializer
+
+    def post(self, request, *args, **kwargs):
+        # Optional: Add logging or custom pre-processing here
+        print("Token refresh requested")
+        response = super().post(request, *args, **kwargs)
+        # Optional: Modify response data here if needed
+        return response
+
+class UserMeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        return Response({
+            "id": user.id,
+            "email": user.email,
+            "role": user.role,
+            "name": user.get_full_name(),
+        })
 
 class RegisterClientView(APIView):
     permission_classes = [AllowAny]
@@ -139,13 +162,32 @@ class StaffAutoRegisterView(APIView):
         serializer = StaffRegistrationSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
+
+            # ✅ Send email to the staff member
+            try:
+                send_mail(
+                    subject='Your Staff Account Credentials',
+                    message=f"Hello {first_name},\n\nYour account has been created.\n\nUsername: {username}\nPassword: {password}\n\nPlease log in and change your password.",
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[email],
+                    fail_silently=False,
+                )
+            except Exception as e:
+                return Response({
+                    'message': 'Staff registered but email could not be sent.',
+                    'username': username,
+                    'password': password,
+                    'error': str(e)
+                }, status=status.HTTP_201_CREATED)
+
             return Response({
-                'message': 'Staff registered successfully.',
+                'message': 'Staff registered and email sent successfully.',
                 'username': username,
                 'password': password
             }, status=status.HTTP_201_CREATED)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 class RegisterAccountantView(APIView):
@@ -304,10 +346,10 @@ class VerifyForgotPasswordEmailView(APIView):
 
 
 class ResetPasswordView(APIView):
-    permission_classes = []  # AllowAny if you want public
+    permission_classes = [IsAuthenticated]  # Require valid token
 
     def post(self, request):
-        serializer = ResetPasswordSerializer(data=request.data)
+        serializer = ResetPasswordSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             serializer.save()
             return Response(
