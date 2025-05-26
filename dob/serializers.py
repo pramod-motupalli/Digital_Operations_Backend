@@ -51,7 +51,7 @@ class ManagerProfileSerializer(serializers.ModelSerializer):
             **validated_data,
             role=CustomUser.ROLE_MANAGER
         )
-        user.is_active = False
+        user.is_active = True
         user.save()
 
         ManagerProfile.objects.create(user=user)
@@ -97,7 +97,7 @@ class TeamLeadRegistrationSerializer(serializers.ModelSerializer):
             password=password,
             role=CustomUser.ROLE_TEAM_LEAD
         )
-        user.is_active = False
+        user.is_active = True
         user.save()
 
         return TeamLeadProfile.objects.create(
@@ -105,6 +105,71 @@ class TeamLeadRegistrationSerializer(serializers.ModelSerializer):
             parent=manager_profile,
             **validated_data
         )
+
+from django.utils.text import slugify
+
+class TeamLeadAutoRegistrationSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(write_only=True)
+    email = serializers.EmailField(write_only=True)
+    designation = serializers.CharField()
+
+    class Meta:
+        model = TeamLeadProfile
+        fields = ['name', 'email', 'designation']  # Removed is_spoc from input
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+        manager_user = request.user
+
+        if not hasattr(manager_user, 'manager_profile'):
+            raise serializers.ValidationError('Only a manager can register a team lead.')
+
+        manager_profile = manager_user.manager_profile
+
+        name = validated_data.pop('name')
+        email = validated_data.pop('email')
+        designation = validated_data.pop('designation')
+
+        # Split name into first and last name
+        name_parts = name.strip().split()
+        if len(name_parts) >= 2:
+            first_name = name_parts[0]
+            last_name = " ".join(name_parts[1:])
+        else:
+            first_name = last_name = name
+
+        # Generate unique username
+        base_username = slugify(name.replace(" ", "").lower())
+        username = base_username
+        counter = 1
+        while CustomUser.objects.filter(username=username).exists():
+            username = f"{base_username}{counter}"
+            counter += 1
+
+        # Generate default password
+        team_lead_count = CustomUser.objects.filter(role=CustomUser.ROLE_TEAM_LEAD).count()
+        password = f"teamlead{team_lead_count + 1}"
+
+        # Create user
+        user = CustomUser.objects.create_user(
+            email=email,
+            username=username,
+            first_name=first_name,
+            last_name=last_name,
+            password=password,
+            role=CustomUser.ROLE_TEAM_LEAD
+        )
+        user.is_active = True
+        user.save()
+
+        # Create TeamLeadProfile with is_spoc set to False
+        return TeamLeadProfile.objects.create(
+            user=user,
+            parent=manager_profile,
+            designation=designation,
+            is_spoc=False  # Set default here
+        )
+
 
 
 # 4️⃣ Staff Registration Serializer
@@ -146,7 +211,7 @@ class StaffRegistrationSerializer(serializers.ModelSerializer):
             password=password,
             role=CustomUser.ROLE_TEAM_MEMBER
         )
-        user.is_active = False
+        user.is_active = True
         user.save()
 
         return StaffProfile.objects.create(
@@ -189,7 +254,7 @@ class AccountantRegistrationSerializer(serializers.ModelSerializer):
             password=validated_data.pop('password'),
             role=CustomUser.ROLE_ACCOUNTANT
         )
-        user.is_active = False
+        user.is_active = True
         user.save()
 
         return AccountantProfile.objects.create(
@@ -199,6 +264,7 @@ class AccountantRegistrationSerializer(serializers.ModelSerializer):
 
 
 # 6️⃣ JWT Token Serializer (Email-based Login)
+
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
     username_field = 'email'
 
@@ -235,7 +301,6 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
         if 'username' in fields:
             del fields['username']
         return fields
-
 
 # 7️⃣ Refresh Token Serializer
 class TokenRefreshSerializer(serializers.Serializer):

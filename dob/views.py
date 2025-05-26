@@ -1,4 +1,5 @@
 from rest_framework.views import APIView
+from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework.response import Response
 from rest_framework import status, generics, viewsets, permissions
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -21,6 +22,7 @@ from .serializers import (
     ManagerProfileSerializer,
     StaffRegistrationSerializer,
     AccountantRegistrationSerializer,
+    TeamLeadAutoRegistrationSerializer,
     PlanSerializer,
     DomainHostingSerializer,
     PlanRequestSerializer,
@@ -32,6 +34,14 @@ import uuid
 
 User = get_user_model()
 
+
+def refresh_access_token(refresh_token):
+    try:
+        refresh = RefreshToken(refresh_token)
+        new_access_token = str(refresh.access_token)
+        return new_access_token
+    except TokenError as e:
+        return None
 
 class MyTokenObtainPairView(TokenObtainPairView):
     serializer_class = MyTokenObtainPairSerializer
@@ -97,6 +107,23 @@ class RegisterTeamLeadView(APIView):
             "username": teamlead_profile.user.username,
             "email": teamlead_profile.user.email
         }, status=status.HTTP_201_CREATED)
+
+
+class TeamLeadAutoRegisterView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        print("Request user:", request.user)
+        print("Is authenticated:", request.user.is_authenticated)
+
+        serializer = TeamLeadAutoRegistrationSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            team_lead = serializer.save()
+            return Response({
+                "message": "Team Lead registered successfully",
+            }, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 class ManagerCreateView(generics.CreateAPIView):
