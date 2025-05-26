@@ -100,9 +100,9 @@ WSGI_APPLICATION = 'Backend_DO.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'digitaloperations',  # Replace with your database name
-        'USER': 'myuser',  # Replace with your database user
-        'PASSWORD': 'Pramod@21',  # Replace with your database password
+        'NAME': 'PGSQL',  # Replace with your database name
+        'USER': 'postgres',  # Replace with your database user
+        'PASSWORD': 'Rushi123',  # Replace with your database password
         'HOST': 'localhost',
         'PORT': '5432',
     }

@@ -11,7 +11,7 @@ from django.urls import reverse
 from django.conf import settings
 from django.shortcuts import redirect, get_object_or_404
 from django.http import JsonResponse
-from dob.models import CustomUser, Plan, DomainHosting, PlanRequest, PaymentRequest
+from dob.models import CustomUser, Plan, DomainHosting, PlanRequest, PaymentRequest, Workspace
 from .serializers import (
     ClientRegistrationSerializer,
     TokenRefreshSerializer,
@@ -24,7 +24,8 @@ from .serializers import (
     PlanSerializer,
     DomainHostingSerializer,
     PlanRequestSerializer,
-    PaymentRequestSerializer
+    PaymentRequestSerializer,
+    WorkspaceSerializer,
 )
 from .emails import send_email_verification_link
 import uuid
@@ -341,12 +342,7 @@ def team_leads_list(request):
 
 
 class SubmissionView(APIView):
-    permission_classes = []  
-
-    def get(self, request):
-        domain_hostings = DomainHosting.objects.all()
-        serializer = DomainHostingSerializer(domain_hostings, many=True)
-        return Response(serializer.data)
+    permission_classes = []
 
     def post(self, request):
         try:
@@ -355,7 +351,9 @@ class SubmissionView(APIView):
             features = request.data.get('features')
             price = request.data.get('price')
             domain_hosting = request.data.get('domain_hosting')
+            domain = None  # Default if domain is not created
 
+            # Always create Plan
             plan = Plan.objects.create(
                 title=title,
                 price=price,
@@ -363,25 +361,42 @@ class SubmissionView(APIView):
                 features=features
             )
 
-            if title.lower() == "plan customization":
+            # Create PlanRequest if plan is a customization
+            if title and title.lower() == "plan customization":
                 PlanRequest.objects.create(plan=plan)
 
-            domain = None
-            if domain_hosting:
-                domain = DomainHosting.objects.create(
-                    plan=plan,
-                    domain_name=domain_hosting.get('domainName', ''),
-                    domain_provider=domain_hosting.get('domainProvider', ''),
-                    domain_account=domain_hosting.get('domainAccount', ''),
-                    domain_expiry=domain_hosting.get('domainExpiry'),
-                    hosting_provider=domain_hosting.get('hostingProvider', ''),
-                    hosting_provider_name=domain_hosting.get('hostingProviderName', ''),
-                    hosting_expiry=domain_hosting.get('hostingExpiry'),
-                    client_name=domain_hosting.get('clientName'),
-                    phone_number=domain_hosting.get('phoneNumber'),
-                    email=domain_hosting.get('email'),
-                    assigned_to=domain_hosting.get('assignedTo'),
-                )
+            # Check if any domain hosting field is filled
+            if domain_hosting and isinstance(domain_hosting, dict):
+                important_fields = [
+                    domain_hosting.get('domainName'),
+                    domain_hosting.get('domainProvider'),
+                    domain_hosting.get('domainAccount'),
+                    domain_hosting.get('domainExpiry'),
+                    domain_hosting.get('hostingProvider'),
+                    domain_hosting.get('hostingProviderName'),
+                    domain_hosting.get('hostingExpiry'),
+                    domain_hosting.get('clientName'),
+                    domain_hosting.get('phoneNumber'),
+                    domain_hosting.get('email'),
+                    domain_hosting.get('assignedTo'),
+                ]
+
+                # Create DomainHosting only if any field is non-empty
+                if any(f for f in important_fields if f and str(f).strip()):
+                    domain = DomainHosting.objects.create(
+                        plan=plan,
+                        domain_name=domain_hosting.get('domainName', ''),
+                        domain_provider=domain_hosting.get('domainProvider', ''),
+                        domain_account=domain_hosting.get('domainAccount', ''),
+                        domain_expiry=domain_hosting.get('domainExpiry'),
+                        hosting_provider=domain_hosting.get('hostingProvider', ''),
+                        hosting_provider_name=domain_hosting.get('hostingProviderName', ''),
+                        hosting_expiry=domain_hosting.get('hostingExpiry'),
+                        client_name=domain_hosting.get('clientName'),
+                        phone_number=domain_hosting.get('phoneNumber'),
+                        email=domain_hosting.get('email'),
+                        assigned_to=domain_hosting.get('assignedTo'),
+                    )
 
             return Response({
                 'message': 'Submission successful',
@@ -393,6 +408,38 @@ class SubmissionView(APIView):
             import traceback
             traceback.print_exc()
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    def get(self, request):
+        domain_hostings = Plan.objects.all()
+        serializer = PlanSerializer(domain_hostings, many=True)
+        return Response(serializer.data)
+class DomainHostingView(APIView):
+    permission_classes = [AllowAny]
+    def get(self, request):
+        domain_hostings = DomainHosting.objects.all()
+        serializer = DomainHostingSerializer(domain_hostings, many=True)
+        return Response(serializer.data)
+    
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def approve_payment(request, plan_id):
+    try:
+        plan = Plan.objects.get(id=plan_id)
+        plan.payment_is_approved = True
+        plan.save()
+        return Response({'message': 'Payment approved successfully'}, status=status.HTTP_200_OK)
+    except Plan.DoesNotExist:
+        return Response({'error': 'Plan not found'}, status=status.HTTP_404_NOT_FOUND)
+
+@api_view(['PATCH'])
+@permission_classes([AllowAny])
+def activate_workspace(request, pk):
+    try:
+        plan = Plan.objects.get(pk=pk)
+        plan.is_workspace_activated = True
+        plan.save()
+        return Response({'message': 'Workspace activated successfully'}, status=status.HTTP_200_OK)
+    except Plan.DoesNotExist:
+        return Response({'error': 'Plan not found'}, status=status.HTTP_404_NOT_FOUND)
 
 
 @api_view(['GET', 'PATCH'])
@@ -413,13 +460,91 @@ def get_or_update_requests(request):
         try:
             req = PlanRequest.objects.get(id=req_id)
             req.overridden_price = new_price
+            req.is_approved = True   # <--- add this line here
             req.save()
-            return Response({'message': 'Price updated'})
+            return Response({'message': 'Price updated and request approved'})
         except PlanRequest.DoesNotExist:
             return Response({'error': 'Request not found'}, status=404)
 
 
-class PaymentRequestViewSet(viewsets.ModelViewSet):
-    permission_classes=[AllowAny]
-    queryset = PaymentRequest.objects.all()
-    serializer_class = PaymentRequestSerializer
+
+# class PaymentRequestViewSet(viewsets.ModelViewSet):
+#     permission_classes=[AllowAny]
+#     queryset = PaymentRequest.objects.all()
+#     serializer_class = PaymentRequestSerializer
+class PaymentRequestView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        try:
+            payment_requests = PaymentRequest.objects.all()
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        serializer = PaymentRequestSerializer(payment_requests, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        plan_request_id = request.data.get('plan_request')
+        price = request.data.get('price')
+
+        try:
+            plan_request = PlanRequest.objects.get(id=plan_request_id)
+
+            # Save price to the Plan model
+            if plan_request.plan:
+                plan_request.plan.price = price
+                plan_request.plan.save()
+
+            # ✅ Save price to PaymentRequest model as well
+            payment_request = PaymentRequest.objects.create(
+                plan_request=plan_request,
+                price=price  # ✅ explicitly save it
+            )
+
+            serializer = PaymentRequestSerializer(payment_request)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        
+        except PlanRequest.DoesNotExist:
+            return Response({'error': 'PlanRequest not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class WorkspaceCreateAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    # CREATE new workspace
+    def post(self, request):
+        serializer = WorkspaceSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({'message': 'Workspace created successfully!'}, status=status.HTTP_201_CREATED)
+        print(serializer.errors)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    # LIST all workspaces
+    def get(self, request):
+        workspaces = Workspace.objects.all()
+        serializer = WorkspaceSerializer(workspaces, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    # FULL UPDATE existing workspace
+    def put(self, request, pk=None):
+        if not pk:
+            return Response({'error': 'Workspace ID is required for update.'}, status=status.HTTP_400_BAD_REQUEST)
+        workspace = get_object_or_404(Workspace, pk=pk)
+        serializer = WorkspaceSerializer(workspace, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({'message': 'Workspace updated successfully!'}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    # PARTIAL UPDATE existing workspace
+    def patch(self, request, pk=None):
+        if not pk:
+            return Response({'error': 'Workspace ID is required for partial update.'}, status=status.HTTP_400_BAD_REQUEST)
+        workspace = get_object_or_404(Workspace, pk=pk)
+        serializer = WorkspaceSerializer(workspace, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({'message': 'Workspace partially updated!'}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

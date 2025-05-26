@@ -6,7 +6,7 @@ from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 from .models import (
     CustomUser, ClientProfile, TeamLeadProfile, StaffProfile,
     AccountantProfile, ManagerProfile, Plan, DomainHosting,
-    PlanRequest, PaymentRequest
+    PlanRequest, PaymentRequest, Workspace
 )
 
 CustomUser = get_user_model()
@@ -280,16 +280,20 @@ class PlanSerializer(serializers.ModelSerializer):
 
 
 # 🔟 Domain Hosting Serializer
+# serializers.py
+
 class DomainHostingSerializer(serializers.ModelSerializer):
-    plan = PlanSerializer()
+    plan_title = serializers.CharField(source='plan.title', read_only=True)
+    plan_price = serializers.DecimalField(source='plan.price', max_digits=10, decimal_places=2, read_only=True)
 
     class Meta:
         model = DomainHosting
-        fields = '__all__'
-        extra_kwargs = {
-            'domain_expiry': {'required': False, 'allow_null': True},
-            'hosting_expiry': {'required': False, 'allow_null': True},
-        }
+        fields = '__all__'  # ✅ Keeps compatibility with other frontends
+        read_only_fields = ['plan_title', 'plan_price', 'client_name', 'phone_number', 'email']
+    def get_plan_price(self, obj):
+        if obj.plan and obj.plan.price:
+            return float(obj.plan.price)
+        return None
 
 
 # 1️⃣1️⃣ Plan Request Serializer
@@ -312,7 +316,7 @@ class PlanRequestSerializer(serializers.ModelSerializer):
             return obj.client.client_profile.contact_number
         except:
             return 'N/A'
-
+        
     def get_plan_price(self, obj):
         return obj.get_price()
 
@@ -326,6 +330,23 @@ class PlanRequestSerializer(serializers.ModelSerializer):
 
 # 1️⃣2️⃣ Payment Request Serializer
 class PaymentRequestSerializer(serializers.ModelSerializer):
+    price = serializers.SerializerMethodField()
+    title = serializers.SerializerMethodField()
+
     class Meta:
         model = PaymentRequest
+        fields = '__all__'  # add other fields you want here
+
+    def get_price(self, obj):
+        # Access the price from related plan
+        if obj.plan_request and obj.plan_request.plan:
+            return obj.plan_request.plan.price
+        return None
+    def get_title(self, obj):
+        return obj.plan_request.plan.title if obj.plan_request and obj.plan_request.plan else None
+
+    
+class WorkspaceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Workspace
         fields = '__all__'
