@@ -262,6 +262,11 @@ class AccountantRegistrationSerializer(serializers.ModelSerializer):
             parent=manager_profile
         )
 
+class CustomUserVisitedSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomUser
+        fields = ['id', 'username', 'email', 'is_visited']
+        read_only_fields = ['id', 'username', 'email']
 
 # 6️⃣ JWT Token Serializer (Email-based Login)
 
@@ -293,6 +298,7 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
             'email': user.email,
             'role': user.role,
             'is_email_verified': user.is_email_verified,
+            'is_visited':user.is_visited,
         }
 
     def get_fields(self):
@@ -313,6 +319,40 @@ class TokenRefreshSerializer(serializers.Serializer):
             return {'access': str(refresh_token.access_token)}
         except TokenError:
             raise serializers.ValidationError('Refresh token is invalid or expired')
+
+# serializers.py
+from rest_framework import serializers
+from .models import CustomUser, TeamLeadProfile, StaffProfile, AccountantProfile
+
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomUser
+        fields = ['id', 'username', 'first_name', 'last_name', 'email', 'role']
+
+
+class TeamLeadSerializer(serializers.ModelSerializer):
+    user = UserSerializer()
+
+    class Meta:
+        model = TeamLeadProfile
+        fields = ['user']
+
+
+class StaffSerializer(serializers.ModelSerializer):
+    user = UserSerializer()
+
+    class Meta:
+        model = StaffProfile
+        fields = ['user']
+
+
+class AccountantSerializer(serializers.ModelSerializer):
+    user = UserSerializer()
+
+    class Meta:
+        model = AccountantProfile
+        fields = ['user']
 
 
 # 8️⃣ Password Reset Serializer

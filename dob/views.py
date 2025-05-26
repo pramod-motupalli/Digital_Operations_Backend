@@ -26,7 +26,8 @@ from .serializers import (
     PlanSerializer,
     DomainHostingSerializer,
     PlanRequestSerializer,
-    PaymentRequestSerializer
+    PaymentRequestSerializer,
+    CustomUserVisitedSerializer
 )
 from .emails import send_email_verification_link
 import uuid
@@ -49,6 +50,7 @@ class MyTokenObtainPairView(TokenObtainPairView):
         data = super().validate(attrs)
         data['role'] = self.user.role
         data['is_email_verified'] = self.user.is_email_verified
+        data['is_visited']= self.user.is_visited
         return data
 
 
@@ -59,7 +61,16 @@ class TokenRefreshView(TokenRefreshView):
         print("Token refresh requested")
         return super().post(request, *args, **kwargs)
 
+class MarkIsVisitedView(APIView):
+    permission_classes = [IsAuthenticated]
 
+    def patch(self, request):
+        user = request.user
+        user.is_visited = True
+        user.save()
+        serializer = CustomUserVisitedSerializer(user)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
 class UserMeView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -163,8 +174,12 @@ class StaffAutoRegisterView(APIView):
             return Response({'error': 'Missing required fields.'}, status=status.HTTP_400_BAD_REQUEST)
 
         name_parts = name.strip().split()
-        first_name = name_parts[0]
-        last_name = " ".join(name_parts[1:]) if len(name_parts) > 1 else ""
+        if len(name_parts) == 1:
+            first_name = last_name = name_parts[0]
+        else:
+            first_name = name_parts[0]
+            last_name = " ".join(name_parts[1:])
+
         base_username = name.replace(" ", "").lower()
         existing_count = CustomUser.objects.filter(username__startswith=base_username).count()
         username = f"{base_username}{existing_count + 1 if existing_count else ''}"
@@ -207,7 +222,6 @@ class StaffAutoRegisterView(APIView):
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
 class RegisterAccountantView(APIView):
     permission_classes = []
 
@@ -224,6 +238,73 @@ class RegisterAccountantView(APIView):
             "manager": accountant_profile.parent.user.username
         }, status=status.HTTP_201_CREATED)
 
+class AccountantAutoRegisterView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        name = request.data.get("name")
+        email = request.data.get("email")
+
+        if not name or not email:
+            return Response({'error': 'Name and email are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Split name into first and last
+        name_parts = name.strip().split()
+        if len(name_parts) == 1:
+            first_name = last_name = name_parts[0]
+        else:
+            first_name = name_parts[0]
+            last_name = " ".join(name_parts[1:])
+
+        # Username and password generation
+        base_username = name.replace(" ", "").lower()
+        existing_count = CustomUser.objects.filter(username__startswith=base_username).count()
+
+        username = f"{base_username}"
+        if existing_count:
+            username += str(existing_count + 1)
+        password = f"accountant{existing_count + 1 if existing_count else 1}"
+
+        # Manager's username from request.user
+        parent_username = request.user.username
+
+        # Prepare data for serializer
+        data = {
+            "email": email,
+            "username": username,
+            "first_name": first_name,
+            "last_name": last_name,
+            "password": password,
+            "parent_username": parent_username
+        }
+
+        serializer = AccountantRegistrationSerializer(data=data)
+        if serializer.is_valid():
+            serializer.save()
+
+            try:
+                send_mail(
+                    subject='Your Accountant Account Credentials',
+                    message=f"Hello {first_name},\n\nYour account has been created.\n\nUsername: {username}\nPassword: {password}\n\nPlease log in and change your password.",
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[email],
+                    fail_silently=False,
+                )
+            except Exception as e:
+                return Response({
+                    'message': 'Accountant created but email could not be sent.',
+                    'username': username,
+                    'password': password,
+                    'error': str(e)
+                }, status=status.HTTP_201_CREATED)
+
+            return Response({
+                'message': 'Accountant created and email sent successfully.',
+                'username': username,
+                'password': password
+            }, status=status.HTTP_201_CREATED)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class VerifyEmailView(APIView):
     permission_classes = [AllowAny]
@@ -450,3 +531,26 @@ class PaymentRequestViewSet(viewsets.ModelViewSet):
     permission_classes=[AllowAny]
     queryset = PaymentRequest.objects.all()
     serializer_class = PaymentRequestSerializer
+
+# views.py
+from rest_framework import generics, permissions
+from .models import TeamLeadProfile, StaffProfile, AccountantProfile
+from .serializers import TeamLeadSerializer, StaffSerializer, AccountantSerializer
+
+
+class TeamLeadListView(generics.ListAPIView):
+    queryset = TeamLeadProfile.objects.all()
+    serializer_class = TeamLeadSerializer
+    permission_classes = [AllowAny]
+
+
+class StaffListView(generics.ListAPIView):
+    queryset = StaffProfile.objects.all()
+    serializer_class = StaffSerializer
+    permission_classes = [AllowAny]
+
+
+class AccountantListView(generics.ListAPIView):
+    queryset = AccountantProfile.objects.all()
+    serializer_class = AccountantSerializer
+    permission_classes = [AllowAny]

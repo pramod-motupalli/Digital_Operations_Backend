@@ -20,6 +20,8 @@ from .views import (
     get_or_update_requests,
     PaymentRequestViewSet,
     TeamLeadAutoRegisterView,
+    AccountantAutoRegisterView,
+    MarkIsVisitedView,TeamLeadListView, StaffListView, AccountantListView,
 )
 
 urlpatterns = [
@@ -45,9 +47,14 @@ urlpatterns = [
     path('create-staff/', RegisterStaffView.as_view(), name='create-staff'),
     path('register-staff/', StaffAutoRegisterView.as_view(), name='register-staff'),
     path('teamlead/register/', TeamLeadAutoRegisterView.as_view(), name='teamlead-register'),
+    path("create-accountant/", AccountantAutoRegisterView.as_view(), name="create-accountant"),
 
     # Misc Views
     path('team-leads/', team_leads_list, name='team-leads-list'),
+    path('get-team-leads/', TeamLeadListView.as_view(), name='team-leads'),
+    path('get-staff-members/', StaffListView.as_view(), name='staff-members'),
+    path('get-accountants/', AccountantListView.as_view(), name='accountants'),
+    path('mark-visited/', MarkIsVisitedView.as_view(), name='mark-visited'),
     path('submissions/', SubmissionView.as_view(), name='submissions'),
     path('plan-requests/', get_or_update_requests, name='plan-requests'),
     path('payment-requests/', PaymentRequestViewSet.as_view({'get': 'list', 'post': 'create'}), name='payment-requests'),
