@@ -172,3 +172,26 @@ class Workspace(models.Model):
 
     def __str__(self):
         return self.workspace_name
+    
+class Task(models.Model):
+    workspace = models.ForeignKey(
+        'Workspace', 
+        on_delete=models.CASCADE, 
+        related_name='tasks'
+    )
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    status = models.CharField(
+        max_length=50,
+        choices=[
+            ('pending', 'Pending'),
+            ('in_progress', 'In Progress'),
+            ('completed', 'Completed'),
+        ],
+        default='pending'
+    )
+    due_date = models.DateField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.title

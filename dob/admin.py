@@ -1,6 +1,6 @@
 from django.contrib import admin
 from .models import CustomUser, ClientProfile,TeamLeadProfile,ManagerProfile,StaffProfile,AccountantProfile
-from .models import Plan, DomainHosting, PlanRequest, Workspace
+from .models import Plan, DomainHosting, PlanRequest, Workspace,Task
 
 admin.site.register(Plan)
 admin.site.register(DomainHosting)
@@ -13,3 +13,4 @@ admin.site.register(ManagerProfile)
 admin.site.register(StaffProfile)
 admin.site.register(AccountantProfile)
 admin.site.register(Workspace)
+admin.site.register(Task)

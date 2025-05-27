@@ -683,3 +683,69 @@ class WorkspaceCreateAPIView(APIView):
             serializer.save()
             return Response({'message': 'Workspace partially updated!'}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+# yourapp/views.py
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status, generics
+from django.shortcuts import get_object_or_404
+from .models import Workspace, Task
+from .serializers import WorkspaceSerializer, TaskSerializer
+
+# --- Workspace Views ---
+
+# View for listing all workspaces and creating a new one
+class WorkspaceListCreateView(generics.ListCreateAPIView):
+    queryset = Workspace.objects.all().order_by('-created_at') # Order by creation date
+    serializer_class = WorkspaceSerializer
+
+    # You might want to associate the workspace with the logged-in user here
+    # def perform_create(self, serializer):
+    #     serializer.save(owner=self.request.user) # Assuming owner field exists and user is authenticated
+
+# View for retrieving, updating, or deleting a single workspace by ID (pk)
+class WorkspaceDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Workspace.objects.all()
+    serializer_class = WorkspaceSerializer
+    lookup_field = 'pk' # Use 'pk' as the URL parameter name by default
+
+# --- Task Views ---
+
+# View for listing tasks for a specific workspace and creating a new task for that workspace
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+from django.shortcuts import get_object_or_404
+from .models import Workspace, Task
+from .serializers import TaskSerializer
+
+class WorkspaceTaskListCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    """
+    List or create tasks for a specific workspace.
+    URL: /api/users/workspaces/<int:workspace_id>/tasks/
+    """
+
+    def get(self, request, workspace_id):
+        """
+        List tasks for the given workspace ID.
+        """
+        workspace = get_object_or_404(Workspace, id=workspace_id)
+        tasks = Task.objects.filter(workspace=workspace).order_by('-created_at')
+        serializer = TaskSerializer(tasks, many=True)
+        return Response(serializer.data)
+
+    def post(self, request, workspace_id):
+        """
+        Create a new task for the given workspace.
+        Expects: { "title": "...", "description": "..." }
+        """
+        workspace = get_object_or_404(Workspace, id=workspace_id)
+        serializer = TaskSerializer(data=request.data)
+
+        if serializer.is_valid():
+            task = serializer.save(workspace=workspace)
+            return Response(TaskSerializer(task).data, status=status.HTTP_201_CREATED)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

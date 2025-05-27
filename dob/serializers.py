@@ -6,7 +6,7 @@ from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 from .models import (
     CustomUser, ClientProfile, TeamLeadProfile, StaffProfile,
     AccountantProfile, ManagerProfile, Plan, DomainHosting,
-    PlanRequest, PaymentRequest, Workspace
+    PlanRequest, PaymentRequest, Workspace,Task
 )
 
 CustomUser = get_user_model()
@@ -455,3 +455,14 @@ class WorkspaceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Workspace
         fields = '__all__'
+        read_only_fields = ['created_at'] 
+
+class TaskSerializer(serializers.ModelSerializer):
+    # Read-only fields set by the backend/db
+    workspace_id = serializers.ReadOnlyField(source='workspace.id')
+    workspace_name = serializers.ReadOnlyField(source='workspace.workspace_name')
+
+    class Meta:
+        model = Task
+        fields = ['id', 'workspace', 'workspace_id', 'workspace_name', 'title', 'description', 'status', 'created_at']
+        read_only_fields = ['workspace', 'workspace_id', 'workspace_name', 'status', 'created_at']

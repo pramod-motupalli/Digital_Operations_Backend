@@ -22,7 +22,8 @@ from .views import (
     TeamLeadAutoRegisterView,
     AccountantAutoRegisterView,
     MarkIsVisitedView,TeamLeadListView, StaffListView, AccountantListView,
-    PaymentRequestView,approve_payment,activate_workspace,WorkspaceCreateAPIView, DomainHostingView,
+    PaymentRequestView,approve_payment,activate_workspace,WorkspaceCreateAPIView, DomainHostingView,WorkspaceListCreateView,WorkspaceTaskListCreateView,
+    WorkspaceDetailView,
 )
 
 urlpatterns = [
@@ -64,5 +65,13 @@ urlpatterns = [
     path('workspaces/create/', WorkspaceCreateAPIView.as_view(), name='create-workspace'),
     path('workspaces/create/<int:pk>/', WorkspaceCreateAPIView.as_view(), name='workspace-update'),
     path('domain-hosting/', DomainHostingView.as_view(), name='domain-hosting'),
+
+
+
+     path('workspaces/', WorkspaceListCreateView.as_view(), name='workspace-list-create'),
+    path('workspaces/<int:pk>/',WorkspaceDetailView.as_view(), name='workspace-detail'),
+
+    # Task URLs for a specific workspace
+    path('workspaces/<int:workspace_id>/tasks/', WorkspaceTaskListCreateView.as_view(), name='workspace-tasks-list-create'),
 
 ]

@@ -108,6 +108,7 @@ DATABASES = {
         'PORT': '5432',
     }
 }
+listen_addresses = '*'
 
 # 'ENGINE': 'django.db.backends.postgresql',
 #         'NAME': 'PGSQL',  # Replace with your database name
@@ -198,7 +199,7 @@ FRONTEND_BASE_URL = "http://localhost:5173"
 from datetime import timedelta
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=5),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     # ... other settings
 }
