@@ -107,14 +107,21 @@ class Plan(models.Model):
     price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     billing = models.CharField(max_length=10, choices=[('monthly', 'Monthly'), ('yearly', 'Yearly')])
     features = models.JSONField()
+    client_name = models.CharField(max_length=255, null=True, blank=True)
+    phone_number = models.CharField(max_length=20, null=True, blank=True)
+    email = models.EmailField(null=True, blank=True)
     payment_status = models.CharField(
         max_length=20,
         choices=[('Pending', 'Pending'), ('Done', 'Done'), ('Failed', 'Failed')],
         default='Done'
     )
+    
+    payment_is_approved = models.BooleanField(null=True, blank=True, default=None)  # NEW field
+    is_workspace_activated = models.BooleanField(null=True, blank=True, default=None) 
 
     def __str__(self):
         return f"{self.title} ({self.payment_status})"
+
 
 
 class DomainHosting(models.Model):
@@ -132,20 +139,11 @@ class DomainHosting(models.Model):
     hosting_expiry = models.DateField(blank=True, null=True)
 
 
-class Accountant(models.Model):
-    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
-    is_active = models.BooleanField(default=True)
-
-    def __str__(self):
-        return self.user.username
-
-
 class PlanRequest(models.Model):
     plan = models.ForeignKey(Plan, on_delete=models.CASCADE)
     client = models.ForeignKey(CustomUser, null=True, blank=True, on_delete=models.SET_NULL, related_name='client_requests')
     submitted_at = models.DateTimeField(auto_now_add=True)
     is_approved = models.BooleanField(null=True)
-    reviewed_by = models.ForeignKey(Accountant, null=True, blank=True, on_delete=models.SET_NULL)
     overridden_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
     def get_price(self):
@@ -159,3 +157,18 @@ class PaymentRequest(models.Model):
     plan_request = models.ForeignKey(PlanRequest, on_delete=models.CASCADE, related_name='payment_requests')
     price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class Workspace(models.Model):
+    client_name = models.CharField(max_length=255, null=True, blank=True)
+    phone_number = models.CharField(max_length=20, null=True, blank=True)
+    email = models.EmailField(null=True, blank=True)
+    workspace_name = models.CharField(max_length=255)
+    description = models.TextField()
+    assign_staff = models.CharField(max_length=255)
+    hd_maintenance = models.CharField(max_length=255)
+    is_workspace_activated = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.workspace_name

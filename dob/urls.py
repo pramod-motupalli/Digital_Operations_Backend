@@ -22,6 +22,7 @@ from .views import (
     TeamLeadAutoRegisterView,
     AccountantAutoRegisterView,
     MarkIsVisitedView,TeamLeadListView, StaffListView, AccountantListView,
+    PaymentRequestView,approve_payment,activate_workspace,WorkspaceCreateAPIView, DomainHostingView,
 )
 
 urlpatterns = [
@@ -57,5 +58,11 @@ urlpatterns = [
     path('mark-visited/', MarkIsVisitedView.as_view(), name='mark-visited'),
     path('submissions/', SubmissionView.as_view(), name='submissions'),
     path('plan-requests/', get_or_update_requests, name='plan-requests'),
-    path('payment-requests/', PaymentRequestViewSet.as_view({'get': 'list', 'post': 'create'}), name='payment-requests'),
+    path('payment-requests/', PaymentRequestView.as_view(), name='payment-requests'),
+    path('<int:plan_id>/approve/', approve_payment, name='approve-payment'),
+    path('<int:pk>/activate/', activate_workspace, name='activate-workspace'),
+    path('workspaces/create/', WorkspaceCreateAPIView.as_view(), name='create-workspace'),
+    path('workspaces/create/<int:pk>/', WorkspaceCreateAPIView.as_view(), name='workspace-update'),
+    path('domain-hosting/', DomainHostingView.as_view(), name='domain-hosting'),
+
 ]
