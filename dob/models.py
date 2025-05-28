@@ -1,7 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 import uuid
-from django.conf import settings
 
 # ------------------- Custom User and Role Models -------------------
 
@@ -104,25 +103,21 @@ class TeamMembership(models.Model):
 # ------------------- Plan & Domain Integration (updated for CustomUser) -------------------
 
 class Plan(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)  # NEW FIELD
-
     title = models.CharField(max_length=100)
     price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     billing = models.CharField(max_length=10, choices=[('monthly', 'Monthly'), ('yearly', 'Yearly')])
     features = models.JSONField()
-    
-    # Optional cached fields (we’ll fill these when creating the plan)
     client_name = models.CharField(max_length=255, null=True, blank=True)
     phone_number = models.CharField(max_length=20, null=True, blank=True)
     email = models.EmailField(null=True, blank=True)
-
     payment_status = models.CharField(
         max_length=20,
         choices=[('Pending', 'Pending'), ('Done', 'Done'), ('Failed', 'Failed')],
         default='Done'
     )
-    payment_is_approved = models.BooleanField(null=True, blank=True, default=None)
-    is_workspace_activated = models.BooleanField(null=True, blank=True, default=None)
+    
+    payment_is_approved = models.BooleanField(null=True, blank=True, default=None)  # NEW field
+    is_workspace_activated = models.BooleanField(null=True, blank=True, default=None) 
 
     def __str__(self):
         return f"{self.title} ({self.payment_status})"
@@ -170,7 +165,6 @@ class Workspace(models.Model):
     email = models.EmailField(null=True, blank=True)
     workspace_name = models.CharField(max_length=255)
     description = models.TextField()
-    assign_spoc = models.CharField(max_length=255, null=True, blank=True)
     assign_staff = models.CharField(max_length=255)
     hd_maintenance = models.CharField(max_length=255)
     is_workspace_activated = models.BooleanField(default=False)

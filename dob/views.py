@@ -448,6 +448,15 @@ def team_leads_list(request):
     leads = CustomUser.objects.filter(role='team_lead').values_list('username', flat=True)
     return JsonResponse(list(leads), safe=False)
 
+@api_view(['GET'])
+@permission_classes([AllowAny])  # Explicitly allows public access
+def team_leads_list_no_spoc(request):
+    leads = CustomUser.objects.filter(
+        role='team_lead',
+        teamlead_profile__is_spoc=False  # Correct use of related_name
+    ).values_list('username', flat=True)
+    
+    return JsonResponse(list(leads), safe=False)
 
 class SubmissionView(APIView):
     permission_classes = [AllowAny]  # Require login
