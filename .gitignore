@@ -174,3 +174,13 @@ cython_debug/
 .pypirc
 dob/migrations
 db.sqlite3
+
+
+# Ignore  all the migrations 
+
+/migrations/.py
+!*/migrations/_init_.py
+
+# Ignore SQLite database file
+
+db.sqlite3
