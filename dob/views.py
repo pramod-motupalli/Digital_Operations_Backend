@@ -534,6 +534,25 @@ class DomainHostingView(APIView):
         domain_hostings = DomainHosting.objects.all()
         serializer = DomainHostingSerializer(domain_hostings, many=True)
         return Response(serializer.data)
+    def patch(self, request, pk=None):
+        try:
+            # Get the ID from the URL
+            domain_hosting = DomainHosting.objects.get(id=pk)
+            status_value = request.data.get("status")
+
+            if status_value:
+                domain_hosting.status = status_value
+                domain_hosting.save()
+                serializer = DomainHostingSerializer(domain_hosting)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            else:
+                return Response({"error": "No status provided"}, status=status.HTTP_400_BAD_REQUEST)
+
+        except DomainHosting.DoesNotExist:
+            return Response({"error": "DomainHosting not found"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
     
 @api_view(['POST'])
 @permission_classes([AllowAny])

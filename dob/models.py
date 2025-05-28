@@ -130,6 +130,12 @@ class Plan(models.Model):
 
 
 class DomainHosting(models.Model):
+    STATUS_CHOICES = [
+        ('running', 'Running'),
+        ('expired', 'Expired'),
+        ('expiring', 'Expiring')
+    ]
+
     plan = models.ForeignKey(Plan, on_delete=models.CASCADE, related_name='domain_hostings')
     client_name = models.CharField(max_length=100, blank=True, null=True)
     phone_number = models.CharField(max_length=20, blank=True, null=True)
@@ -142,6 +148,16 @@ class DomainHosting(models.Model):
     hosting_provider = models.CharField(max_length=100, blank=True, null=True)
     hosting_provider_name = models.CharField(max_length=100, blank=True, null=True)
     hosting_expiry = models.DateField(blank=True, null=True)
+
+    # ✅ New status field
+    status = models.CharField(
+        max_length=10,
+        choices=STATUS_CHOICES,
+        default='running',
+    )
+
+    def __str__(self):
+        return f"{self.client_name} - {self.domain_name}"
 
 
 class PlanRequest(models.Model):

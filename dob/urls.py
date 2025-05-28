@@ -74,5 +74,6 @@ urlpatterns = [
     # Task URLs for a specific workspace
     path('workspaces/<int:workspace_id>/tasks/', WorkspaceTaskListCreateView.as_view(), name='workspace-tasks-list-create'),
     path('assign-spoc/', AssignSpocView.as_view(), name='assign-spoc'),
+    path('domain-hosting/<int:pk>/', DomainHostingView.as_view(), name='domain-hosting-detail'),
 
 ]
