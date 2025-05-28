@@ -26,7 +26,7 @@ class CustomUser(AbstractUser):
     first_name = models.CharField(max_length=30, blank=True)
     last_name = models.CharField(max_length=30, blank=True)
     is_email_verified = models.BooleanField(default=False)
-    is_visited=models.BooleanField(default=False)
+    is_visited = models.BooleanField(default=False)
     email_verification_token = models.CharField(max_length=64, blank=True, null=True)
     email_verification_uuid = models.UUIDField(default=uuid.uuid4, unique=True, null=True, blank=True)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default=ROLE_CLIENT)
