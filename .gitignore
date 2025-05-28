@@ -178,8 +178,8 @@ cython_debug/
 
 # Ignore  all the migrations 
 
-/migrations/.py
-!*/migrations/_init_.py
+# /migrations/.py
+# !*/migrations/_init_.py
 
 # Ignore SQLite database file
 
