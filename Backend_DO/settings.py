@@ -100,15 +100,20 @@ WSGI_APPLICATION = 'Backend_DO.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'digitaloperations',  # Replace with your database name
-        'USER': 'myuser',  # Replace with your database user
-        'PASSWORD': 'Pramod@21',  # Replace with your database password
-        'HOST': 'localhost',
-        'PORT': '5432',
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 listen_addresses = '*'
+
+
+# 'ENGINE': 'django.db.backends.postgresql',
+# 'NAME': 'digitaloperations',  # Replace with your database name
+# 'USER': 'myuser',  # Replace with your database user
+# 'PASSWORD': 'Pramod@21',  # Replace with your database password
+# 'HOST': 'localhost',
+# 'PORT': '5432',
+
 
 # 'ENGINE': 'django.db.backends.postgresql',
 #         'NAME': 'PGSQL',  # Replace with your database name

@@ -450,7 +450,7 @@ def team_leads_list(request):
 
 
 class SubmissionView(APIView):
-    permission_classes = []
+    permission_classes = [AllowAny]  # Require login
 
     def post(self, request):
         try:
@@ -461,12 +461,19 @@ class SubmissionView(APIView):
             domain_hosting = request.data.get('domain_hosting')
             domain = None  # Default if domain is not created
 
-            # Always create Plan
+            user = request.user if request.user.is_authenticated else None  # Get the logged-in user
+            client_profile = getattr(user, 'client_profile', None)
+
+            # Create Plan with user info
             plan = Plan.objects.create(
+                user=user,
                 title=title,
                 price=price,
                 billing=billing,
-                features=features
+                features=features,
+                client_name=user.username if user else None,
+                phone_number=user.client_profile.contact_number if user and hasattr(user, 'client_profile') else None,
+                email=user.email if user else None,
             )
 
             # Create PlanRequest if plan is a customization
@@ -489,7 +496,6 @@ class SubmissionView(APIView):
                     domain_hosting.get('assignedTo'),
                 ]
 
-                # Create DomainHosting only if any field is non-empty
                 if any(f for f in important_fields if f and str(f).strip()):
                     domain = DomainHosting.objects.create(
                         plan=plan,
@@ -516,10 +522,12 @@ class SubmissionView(APIView):
             import traceback
             traceback.print_exc()
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
     def get(self, request):
-        domain_hostings = Plan.objects.all()
-        serializer = PlanSerializer(domain_hostings, many=True)
+        plans = Plan.objects.all()
+        serializer = PlanSerializer(plans, many=True)
         return Response(serializer.data)
+
 class DomainHostingView(APIView):
     permission_classes = [AllowAny]
     def get(self, request):
@@ -749,3 +757,18 @@ class WorkspaceTaskListCreateView(APIView):
             return Response(TaskSerializer(task).data, status=status.HTTP_201_CREATED)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AssignSpocView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        username = request.data.get("username")
+        try:
+            user = CustomUser.objects.get(username=username)
+            teamlead_profile = TeamLeadProfile.objects.get(user=user)
+            teamlead_profile.is_spoc = True
+            teamlead_profile.save()
+            return Response({"message": f"{username} is now a SPOC"}, status=status.HTTP_200_OK)
+        except (CustomUser.DoesNotExist, TeamLeadProfile.DoesNotExist):
+            return Response({"error": "Team Lead not found"}, status=status.HTTP_404_NOT_FOUND)
