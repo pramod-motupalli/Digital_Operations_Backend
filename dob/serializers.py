@@ -382,7 +382,7 @@ class PlanSerializer(serializers.ModelSerializer):
     class Meta:
         model = Plan
         fields = '__all__'
-        read_only_fields = ['client_name', 'phone_number', 'email']  # prevent manual override
+        read_only_fields = ['client_name', 'phone_number', 'email']
 
 
 

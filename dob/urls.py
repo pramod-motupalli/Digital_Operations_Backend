@@ -68,13 +68,13 @@ urlpatterns = [
 
 
 
-     path('workspaces/', WorkspaceListCreateView.as_view(), name='workspace-list-create'),
+    path('workspaces/', WorkspaceListCreateView.as_view(), name='workspace-list-create'),
     path('workspaces/<int:pk>/',WorkspaceDetailView.as_view(), name='workspace-detail'),
 
     # Task URLs for a specific workspace
     path('workspaces/<int:workspace_id>/tasks/', WorkspaceTaskListCreateView.as_view(), name='workspace-tasks-list-create'),
     path('assign-spoc/', AssignSpocView.as_view(), name='assign-spoc'),
     path('domain-hosting/<int:pk>/', DomainHostingView.as_view(), name='domain-hosting-detail'),
-     path('team-leads/no-spoc/', team_leads_list_no_spoc, name='team-leads-no-spoc'),
+    path('team-leads/no-spoc/', team_leads_list_no_spoc, name='team-leads-no-spoc'),
 
 ]

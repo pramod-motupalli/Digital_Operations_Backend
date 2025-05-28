@@ -119,7 +119,7 @@ class Plan(models.Model):
     payment_is_approved = models.BooleanField(null=True, blank=True, default=None)  # NEW field
     is_workspace_activated = models.BooleanField(null=True, blank=True, default=None) 
 
-    def __str__(self):
+    def _str_(self):
         return f"{self.title} ({self.payment_status})"
 
 
