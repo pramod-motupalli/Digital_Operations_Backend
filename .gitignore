@@ -172,8 +172,8 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
-# dob/migrations
-# db.sqlite3
+dob/migrations
+db.sqlite3
 
 
 # Ignore  all the migrations 
