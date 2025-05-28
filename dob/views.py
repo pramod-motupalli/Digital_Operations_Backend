@@ -449,6 +449,12 @@ def team_leads_list(request):
     return JsonResponse(list(leads), safe=False)
 
 @api_view(['GET'])
+def staff_members_list(request):
+    leads = CustomUser.objects.filter(role='team_member').values_list('username', flat=True)
+    return JsonResponse(list(leads), safe=False)
+
+
+@api_view(['GET'])
 @permission_classes([AllowAny])  # Explicitly allows public access
 def team_leads_list_no_spoc(request):
     leads = CustomUser.objects.filter(
