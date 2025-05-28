@@ -23,7 +23,7 @@ from .views import (
     AccountantAutoRegisterView,
     MarkIsVisitedView,TeamLeadListView, StaffListView, AccountantListView,
     PaymentRequestView,approve_payment,activate_workspace,WorkspaceCreateAPIView, DomainHostingView,WorkspaceListCreateView,WorkspaceTaskListCreateView,
-    WorkspaceDetailView,
+    WorkspaceDetailView, AssignSpocView
 )
 
 urlpatterns = [
@@ -73,5 +73,6 @@ urlpatterns = [
 
     # Task URLs for a specific workspace
     path('workspaces/<int:workspace_id>/tasks/', WorkspaceTaskListCreateView.as_view(), name='workspace-tasks-list-create'),
+    path('assign-spoc/', AssignSpocView.as_view(), name='assign-spoc'),
 
 ]
