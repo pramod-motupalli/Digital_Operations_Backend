@@ -384,20 +384,6 @@ class PlanSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ['client_name', 'phone_number', 'email']  # prevent manual override
 
-    def create(self, validated_data):
-        user = self.context['request'].user
-
-        client_profile = getattr(user, 'client_profile', None)
-
-        plan = Plan.objects.create(
-            user=user,
-            client_name=user.username,
-            email=user.email,
-            phone_number=client_profile.contact_number if client_profile else "",
-            **validated_data
-        )
-        return plan
-
 
 
 # 🔟 Domain Hosting Serializer

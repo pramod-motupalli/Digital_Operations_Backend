@@ -448,6 +448,15 @@ def team_leads_list(request):
     leads = CustomUser.objects.filter(role='team_lead').values_list('username', flat=True)
     return JsonResponse(list(leads), safe=False)
 
+@api_view(['GET'])
+@permission_classes([AllowAny])  # Explicitly allows public access
+def team_leads_list_no_spoc(request):
+    leads = CustomUser.objects.filter(
+        role='team_lead',
+        teamlead_profile__is_spoc=False  # Correct use of related_name
+    ).values_list('username', flat=True)
+    
+    return JsonResponse(list(leads), safe=False)
 
 class SubmissionView(APIView):
     permission_classes = [AllowAny]  # Require login
@@ -461,19 +470,12 @@ class SubmissionView(APIView):
             domain_hosting = request.data.get('domain_hosting')
             domain = None  # Default if domain is not created
 
-            user = request.user if request.user.is_authenticated else None  # Get the logged-in user
-            client_profile = getattr(user, 'client_profile', None)
-
             # Create Plan with user info
             plan = Plan.objects.create(
-                user=user,
                 title=title,
                 price=price,
                 billing=billing,
-                features=features,
-                client_name=user.username if user else None,
-                phone_number=user.client_profile.contact_number if user and hasattr(user, 'client_profile') else None,
-                email=user.email if user else None,
+                features=features
             )
 
             # Create PlanRequest if plan is a customization
