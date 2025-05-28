@@ -444,13 +444,13 @@ class ResetPasswordView(APIView):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated]) 
+@permission_classes([AllowAny]) 
 def team_leads_list(request):
     leads = CustomUser.objects.filter(role='team_lead').values_list('username', flat=True)
     return JsonResponse(list(leads), safe=False)
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated]) 
+@api_view(['GET']) 
+@permission_classes([AllowAny]) 
 def staff_members_list(request):
     leads = CustomUser.objects.filter(role='team_member').values_list('username', flat=True)
     return JsonResponse(list(leads), safe=False)
