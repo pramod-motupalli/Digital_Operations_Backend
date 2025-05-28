@@ -470,7 +470,8 @@ class SubmissionView(APIView):
             domain_hosting = request.data.get('domain_hosting')
             domain = None  # Default if domain is not created
 
-            user = request.user if request.user.is_authenticated else None  # Get the logged-in user
+            user = request.user
+            print(user)
             client_profile = getattr(user, 'client_profile', None)
 
             # Create Plan with user info
