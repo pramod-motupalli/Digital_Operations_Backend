@@ -179,7 +179,7 @@ db.sqlite3
 # Ignore  all the migrations 
 
 /migrations/.py
-!*/migrations/_init_.py
+!*/migrations/__init__.py
 
 # Ignore SQLite database file
 
