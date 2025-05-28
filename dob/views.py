@@ -444,11 +444,13 @@ class ResetPasswordView(APIView):
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated]) 
 def team_leads_list(request):
     leads = CustomUser.objects.filter(role='team_lead').values_list('username', flat=True)
     return JsonResponse(list(leads), safe=False)
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated]) 
 def staff_members_list(request):
     leads = CustomUser.objects.filter(role='team_member').values_list('username', flat=True)
     return JsonResponse(list(leads), safe=False)
@@ -666,10 +668,10 @@ class PaymentRequestView(APIView):
                 plan_request.plan.price = price
                 plan_request.plan.save()
 
-            # ✅ Save price to PaymentRequest model as well
+            #Save price to PaymentRequest model as well
             payment_request = PaymentRequest.objects.create(
                 plan_request=plan_request,
-                price=price  # ✅ explicitly save it
+                price=price  #explicitly save it
             )
 
             serializer = PaymentRequestSerializer(payment_request)
