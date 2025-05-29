@@ -545,23 +545,32 @@ class SubmissionView(APIView):
 
 class DomainHostingView(APIView):
     permission_classes = [AllowAny]
+
     def get(self, request):
         domain_hostings = DomainHosting.objects.all()
         serializer = DomainHostingSerializer(domain_hostings, many=True)
         return Response(serializer.data)
+
     def patch(self, request, pk=None):
         try:
-            # Get the ID from the URL
             domain_hosting = DomainHosting.objects.get(id=pk)
-            status_value = request.data.get("status")
+            data = {}
 
-            if status_value:
-                domain_hosting.status = status_value
-                domain_hosting.save()
-                serializer = DomainHostingSerializer(domain_hosting)
+            # Collect updatable fields
+            if "status" in request.data:
+                data["status"] = request.data["status"]
+            if "hd_payment_status" in request.data:
+                data["hd_payment_status"] = request.data["hd_payment_status"]
+
+            if not data:
+                return Response({"error": "No valid fields provided"}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Serialize and validate partial update
+            serializer = DomainHostingSerializer(domain_hosting, data=data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
                 return Response(serializer.data, status=status.HTTP_200_OK)
-            else:
-                return Response({"error": "No status provided"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         except DomainHosting.DoesNotExist:
             return Response({"error": "DomainHosting not found"}, status=status.HTTP_404_NOT_FOUND)

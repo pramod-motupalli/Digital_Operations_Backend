@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from datetime import date, timedelta
 import uuid
 
 # ------------------- Custom User and Role Models -------------------
@@ -116,7 +117,10 @@ class Plan(models.Model):
         choices=[('Pending', 'Pending'), ('Done', 'Done'), ('Failed', 'Failed')],
         default='Done'
     )
-    
+
+
+
+
     payment_is_approved = models.BooleanField(null=True, blank=True, default=None)  # NEW field
     is_workspace_activated = models.BooleanField(null=True, blank=True, default=None) 
 
@@ -132,7 +136,13 @@ class DomainHosting(models.Model):
         ('expiring', 'Expiring')
     ]
 
-    plan = models.ForeignKey(Plan, on_delete=models.CASCADE, related_name='domain_hostings')
+    HD_PAYMENT_STATUS_CHOICES = [
+        ('unavailable', 'Unavailable'),
+        ('pending', 'Pending'),
+        ('done', 'Done')
+    ]
+
+    plan = models.ForeignKey('Plan', on_delete=models.CASCADE, related_name='domain_hostings')
     client_name = models.CharField(max_length=100, blank=True, null=True)
     phone_number = models.CharField(max_length=20, blank=True, null=True)
     email = models.EmailField(blank=True, null=True)
@@ -145,15 +155,41 @@ class DomainHosting(models.Model):
     hosting_provider_name = models.CharField(max_length=100, blank=True, null=True)
     hosting_expiry = models.DateField(blank=True, null=True)
 
-    # ✅ New status field
     status = models.CharField(
         max_length=10,
         choices=STATUS_CHOICES,
         default='running',
     )
 
+    hd_payment_status = models.CharField(
+        max_length=15,
+        choices=HD_PAYMENT_STATUS_CHOICES,
+        default='unavailable',
+    )
+
+    def save(self, *args, **kwargs):
+        # Update status based on hosting_expiry
+        if self.hosting_expiry:
+            today = date.today()
+            if self.hosting_expiry < today:
+                self.status = 'expired'
+            elif self.hosting_expiry <= today + timedelta(days=30):
+                self.status = 'expiring'
+            else:
+                self.status = 'running'
+
+        # Update H&D payment status based on current status
+        if self.status in ['running', 'expiring']:
+            self.hd_payment_status = 'unavailable'
+        elif self.status == 'expired' and self.hd_payment_status == 'unavailable':
+            self.hd_payment_status = 'pending'  # default when expired
+
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.client_name} - {self.domain_name}"
+
+
 
 
 class PlanRequest(models.Model):
