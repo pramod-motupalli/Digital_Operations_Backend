@@ -543,6 +543,13 @@ class SubmissionView(APIView):
         serializer = PlanSerializer(plans, many=True)
         return Response(serializer.data)
 
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import AllowAny
+from .models import DomainHosting
+from .serializers import DomainHostingSerializer
+
 class DomainHostingView(APIView):
     permission_classes = [AllowAny]
 
@@ -556,16 +563,31 @@ class DomainHostingView(APIView):
             domain_hosting = DomainHosting.objects.get(id=pk)
             data = {}
 
-            # Collect updatable fields
-            if "status" in request.data:
-                data["status"] = request.data["status"]
+            # Handle H&D payment status
             if "hd_payment_status" in request.data:
-                data["hd_payment_status"] = request.data["hd_payment_status"]
+                new_payment_status = request.data["hd_payment_status"]
+                if new_payment_status not in ["pending", "done"]:
+                    return Response({"error": "Invalid payment status."}, status=status.HTTP_400_BAD_REQUEST)
+                data["hd_payment_status"] = new_payment_status
+
+            # Handle status update
+            if "status" in request.data:
+                new_status = request.data["status"]
+                if new_status not in ["running", "expired", "expiring"]:
+                    return Response({"error": "Invalid status."}, status=status.HTTP_400_BAD_REQUEST)
+                data["status"] = new_status
+
+            # Handle domain expiry date update
+            if "domain_expiry" in request.data:
+                data["domain_expiry"] = request.data["domain_expiry"]
+
+            # Handle hosting expiry date update
+            if "hosting_expiry" in request.data:
+                data["hosting_expiry"] = request.data["hosting_expiry"]
 
             if not data:
                 return Response({"error": "No valid fields provided"}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Serialize and validate partial update
             serializer = DomainHostingSerializer(domain_hosting, data=data, partial=True)
             if serializer.is_valid():
                 serializer.save()
@@ -577,7 +599,7 @@ class DomainHostingView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def approve_payment(request, plan_id):
@@ -819,13 +841,8 @@ class AssignSpocView(APIView):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def get_logged_in_client(request):
-    print("📌 get_logged_in_client was called!")
-
     user = request.user
     profile = getattr(user, 'client_profile', None)
-
-    print(f"Debug - Contact Number for {user.username}: {profile.contact_number if profile else 'No profile found'}")
-
     return Response({
         'id': user.id,
         'email': user.email,

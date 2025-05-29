@@ -1,6 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
-from datetime import date, timedelta
+from datetime import datetime, date, timedelta
 import uuid
 
 # ------------------- Custom User and Role Models -------------------
@@ -128,6 +128,8 @@ class Plan(models.Model):
         return f"{self.title} ({self.payment_status})"
 
 
+from django.db import models
+from datetime import date, datetime, timedelta
 
 class DomainHosting(models.Model):
     STATUS_CHOICES = [
@@ -137,7 +139,6 @@ class DomainHosting(models.Model):
     ]
 
     HD_PAYMENT_STATUS_CHOICES = [
-        ('unavailable', 'Unavailable'),
         ('pending', 'Pending'),
         ('done', 'Done')
     ]
@@ -164,13 +165,20 @@ class DomainHosting(models.Model):
     hd_payment_status = models.CharField(
         max_length=15,
         choices=HD_PAYMENT_STATUS_CHOICES,
-        default='unavailable',
+        default='pending',  # ⬅️ Change this from 'done' to 'pending'
     )
 
     def save(self, *args, **kwargs):
-        # Update status based on hosting_expiry
+        today = date.today()
+
+        if isinstance(self.hosting_expiry, str):
+            try:
+                self.hosting_expiry = datetime.strptime(self.hosting_expiry, "%Y-%m-%d").date()
+            except ValueError:
+                raise ValueError("Invalid date format for hosting_expiry. Expected YYYY-MM-DD.")
+
+        # Set only the status — no longer touch hd_payment_status
         if self.hosting_expiry:
-            today = date.today()
             if self.hosting_expiry < today:
                 self.status = 'expired'
             elif self.hosting_expiry <= today + timedelta(days=30):
@@ -178,16 +186,10 @@ class DomainHosting(models.Model):
             else:
                 self.status = 'running'
 
-        # Update H&D payment status based on current status
-        if self.status in ['running', 'expiring']:
-            self.hd_payment_status = 'unavailable'
-        elif self.status == 'expired' and self.hd_payment_status == 'unavailable':
-            self.hd_payment_status = 'pending'  # default when expired
-
         super().save(*args, **kwargs)
 
-    def __str__(self):
-        return f"{self.client_name} - {self.domain_name}"
+
+
 
 
 
