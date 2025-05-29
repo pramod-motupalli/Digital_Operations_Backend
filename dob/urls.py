@@ -77,6 +77,6 @@ urlpatterns = [
     path('domain-hosting/<int:pk>/', DomainHostingView.as_view(), name='domain-hosting-detail'),
     path('team-leads/no-spoc/', team_leads_list_no_spoc, name='team-leads-no-spoc'),
     path('staff-members/', staff_members_list, name='staff-members-list'),
-    path('me/', get_logged_in_client, name = 'get_logged_in_client'),
+    path('hey/', get_logged_in_client, name = 'get_logged_in_client'),
 
 ]

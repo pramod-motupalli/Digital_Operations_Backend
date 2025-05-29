@@ -472,7 +472,7 @@ class SubmissionView(APIView):
     def post(self, request):
         try:
             user = request.user
-            profile = getattr(user, 'clientprofile', None)
+            profile = getattr(user, 'client_profile', None)
             title = request.data.get('title')
             billing = request.data.get('billing')
             features = request.data.get('features')
@@ -810,8 +810,12 @@ class AssignSpocView(APIView):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def get_logged_in_client(request):
+    print("📌 get_logged_in_client was called!")
+
     user = request.user
-    profile = getattr(user, 'clientprofile', None)
+    profile = getattr(user, 'client_profile', None)
+
+    print(f"Debug - Contact Number for {user.username}: {profile.contact_number if profile else 'No profile found'}")
 
     return Response({
         'id': user.id,
