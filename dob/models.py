@@ -107,9 +107,10 @@ class Plan(models.Model):
     price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     billing = models.CharField(max_length=10, choices=[('monthly', 'Monthly'), ('yearly', 'Yearly')])
     features = models.JSONField()
-    client_name = models.CharField(CustomUser, max_length=255, null=True, blank=True)
-    phone_number = models.CharField(CustomUser, max_length=20, null=True, blank=True)
-    email = models.EmailField(CustomUser, null=True, blank=True)
+    client_name = models.CharField(max_length=255, null=True, blank=True)
+    phone_number = models.CharField(max_length=20, null=True, blank=True)
+    email = models.EmailField(null=True, blank=True)
+
     payment_status = models.CharField(
         max_length=20,
         choices=[('Pending', 'Pending'), ('Done', 'Done'), ('Failed', 'Failed')],
@@ -119,7 +120,7 @@ class Plan(models.Model):
     payment_is_approved = models.BooleanField(null=True, blank=True, default=None)  # NEW field
     is_workspace_activated = models.BooleanField(null=True, blank=True, default=None) 
 
-    def _str_(self):
+    def __str__(self):
         return f"{self.title} ({self.payment_status})"
 
 

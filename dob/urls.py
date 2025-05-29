@@ -23,7 +23,7 @@ from .views import (
     AccountantAutoRegisterView,
     MarkIsVisitedView,TeamLeadListView, StaffListView, AccountantListView,
     PaymentRequestView,approve_payment,activate_workspace,WorkspaceCreateAPIView, DomainHostingView,WorkspaceListCreateView,WorkspaceTaskListCreateView,
-    WorkspaceDetailView, AssignSpocView,team_leads_list_no_spoc, staff_members_list
+    WorkspaceDetailView, AssignSpocView,team_leads_list_no_spoc, staff_members_list, get_logged_in_client,
 )
 
 urlpatterns = [
@@ -77,5 +77,6 @@ urlpatterns = [
     path('domain-hosting/<int:pk>/', DomainHostingView.as_view(), name='domain-hosting-detail'),
     path('team-leads/no-spoc/', team_leads_list_no_spoc, name='team-leads-no-spoc'),
     path('staff-members/', staff_members_list, name='staff-members-list'),
+    path('me/', get_logged_in_client, name = 'get_logged_in_client'),
 
 ]

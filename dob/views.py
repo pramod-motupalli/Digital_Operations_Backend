@@ -471,6 +471,8 @@ class SubmissionView(APIView):
 
     def post(self, request):
         try:
+            user = request.user
+            profile = getattr(user, 'clientprofile', None)
             title = request.data.get('title')
             billing = request.data.get('billing')
             features = request.data.get('features')
@@ -483,7 +485,10 @@ class SubmissionView(APIView):
                 title=title,
                 price=price,
                 billing=billing,
-                features=features
+                features=features,
+                client_name=f"{user.first_name} {user.last_name}",
+                phone_number=profile.contact_number if profile else '',
+                email=user.email,                
             )
 
             # Create PlanRequest if plan is a customization
@@ -516,9 +521,9 @@ class SubmissionView(APIView):
                         hosting_provider=domain_hosting.get('hostingProvider', ''),
                         hosting_provider_name=domain_hosting.get('hostingProviderName', ''),
                         hosting_expiry=domain_hosting.get('hostingExpiry'),
-                        client_name=domain_hosting.get('clientName'),
-                        phone_number=domain_hosting.get('phoneNumber'),
-                        email=domain_hosting.get('email'),
+                        client_name=f"{user.first_name} {user.last_name}",
+                        phone_number=profile.contact_number if profile else '',
+                        email=user.email,
                         assigned_to=domain_hosting.get('assignedTo'),
                     )
 
@@ -801,3 +806,19 @@ class AssignSpocView(APIView):
             return Response({"message": f"{username} is now a SPOC"}, status=status.HTTP_200_OK)
         except (CustomUser.DoesNotExist, TeamLeadProfile.DoesNotExist):
             return Response({"error": "Team Lead not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_logged_in_client(request):
+    user = request.user
+    profile = getattr(user, 'clientprofile', None)
+
+    return Response({
+        'id': user.id,
+        'email': user.email,
+        'username': user.username,
+        'first_name': user.first_name,
+        'last_name': user.last_name,
+        'phone_number': profile.contact_number if profile else '',
+        'company_name': profile.company_name if profile else '',
+    })
