@@ -392,7 +392,7 @@ class ClientUserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CustomUser
-        fields = ['username', 'email', 'contact_number']
+        fields = ['id', 'username', 'email', 'contact_number']
 
     def get_contact_number(self, obj):
         try:
@@ -459,9 +459,10 @@ class PaymentRequestSerializer(serializers.ModelSerializer):
 
     
 class WorkspaceSerializer(serializers.ModelSerializer):
-    assign_staff = UserSerializer(read_only=True)
-    assign_spoc = UserSerializer(read_only=True)
-    hd_maintenance = UserSerializer(read_only=True)
+    client = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.all())
+    assign_spoc = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.all())
+    assign_staff = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.all())
+    hd_maintenance = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.all())
 
     class Meta:
         model = Workspace

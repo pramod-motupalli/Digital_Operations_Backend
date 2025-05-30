@@ -468,22 +468,13 @@ def team_leads_list_no_spoc(request):
     return JsonResponse(list(leads), safe=False)
 
 
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from rest_framework.permissions import IsAuthenticated  # change to AllowAny if needed
-
-from .models import Plan, DomainHosting, PlanRequest
-from .serializers import PlanSerializer
 
 class SubmissionView(APIView):
-    permission_classes = [IsAuthenticated]  # Requires user to be logged in
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         try:
             user = request.user
-
-            # Extract data from request
             title = request.data.get('title')
             billing = request.data.get('billing')
             features = request.data.get('features')
@@ -491,20 +482,17 @@ class SubmissionView(APIView):
             domain_hosting = request.data.get('domain_hosting')
             domain = None
 
-            # ✅ Create Plan linked to client (FK only)
             plan = Plan.objects.create(
                 title=title,
                 price=price,
                 billing=billing,
                 features=features,
-                client=user  # FK only
+                client=user
             )
 
-            # ✅ Create PlanRequest if customization
             if title and title.lower() == "plan customization":
                 PlanRequest.objects.create(plan=plan)
 
-            # ✅ If domain hosting info is present, store it
             if domain_hosting and isinstance(domain_hosting, dict):
                 required_fields = [
                     domain_hosting.get('domainName'),
@@ -543,17 +531,10 @@ class SubmissionView(APIView):
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def get(self, request):
-        # Optional: only return plans belonging to the logged-in client
-        plans = Plan.objects.filter(client=request.user)
+        plans = Plan.objects.all()
         serializer = PlanSerializer(plans, many=True)
         return Response(serializer.data)
 
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from rest_framework.permissions import AllowAny
-from .models import DomainHosting
-from .serializers import DomainHostingSerializer
 
 class DomainHostingView(APIView):
     permission_classes = [AllowAny]
@@ -665,18 +646,16 @@ from .serializers import TeamLeadSerializer, StaffSerializer, AccountantSerializ
 
 
 class TeamLeadListView(generics.ListAPIView):
-    queryset = TeamLeadProfile.objects.select_related('user').all()
+    queryset = TeamLeadProfile.objects.all()
     serializer_class = TeamLeadSerializer
-    permission_classes = [AllowAny]  # or IsAuthenticated if needed
+    permission_classes = [AllowAny]
 
 
-class StaffListView(APIView):
-    permission_classes = []
+class StaffListView(generics.ListAPIView):
+    queryset = StaffProfile.objects.all()
+    serializer_class = StaffSerializer
+    permission_classes = [AllowAny]
 
-    def get(self, request):
-        staff_profiles = StaffProfile.objects.select_related('user').all()
-        serializer = StaffSerializer(staff_profiles, many=True)
-        return Response(serializer.data)
 
 class AccountantListView(generics.ListAPIView):
     queryset = AccountantProfile.objects.all()
@@ -845,20 +824,6 @@ class AssignSpocView(APIView):
         except (CustomUser.DoesNotExist, TeamLeadProfile.DoesNotExist):
             return Response({"error": "Team Lead not found"}, status=status.HTTP_404_NOT_FOUND)
 
-# @api_view(['GET'])
-# @permission_classes([AllowAny])
-# def get_logged_in_client(request):
-#     user = request.user
-#     profile = getattr(user, 'client_profile', None)
-#     return Response({
-#         'id': user.id,
-#         'email': user.email,
-#         'username': user.username,
-#         'first_name': user.first_name,
-#         'last_name': user.last_name,
-#         'phone_number': profile.contact_number if profile else '',
-#         'company_name': profile.company_name if profile else '',
-#     })
 
 from dob.models import ClientProfile  # Make sure this import exists
 
