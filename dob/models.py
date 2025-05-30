@@ -108,9 +108,8 @@ class Plan(models.Model):
     price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     billing = models.CharField(max_length=10, choices=[('monthly', 'Monthly'), ('yearly', 'Yearly')])
     features = models.JSONField()
-    client_name = models.CharField(max_length=255, null=True, blank=True)
-    phone_number = models.CharField(max_length=20, null=True, blank=True)
-    email = models.EmailField(null=True, blank=True)
+
+    client = models.ForeignKey('CustomUser', on_delete=models.SET_NULL, null=True, blank=True, related_name='plans')  # FK here
 
     payment_status = models.CharField(
         max_length=20,
@@ -118,35 +117,18 @@ class Plan(models.Model):
         default='Done'
     )
 
-
-
-
-    payment_is_approved = models.BooleanField(null=True, blank=True, default=None)  # NEW field
-    is_workspace_activated = models.BooleanField(null=True, blank=True, default=None) 
+    payment_is_approved = models.BooleanField(null=True, blank=True, default=None)
+    is_workspace_activated = models.BooleanField(null=True, blank=True, default=None)
 
     def __str__(self):
         return f"{self.title} ({self.payment_status})"
 
 
-from django.db import models
-from datetime import date, datetime, timedelta
 
 class DomainHosting(models.Model):
-    STATUS_CHOICES = [
-        ('running', 'Running'),
-        ('expired', 'Expired'),
-        ('expiring', 'Expiring')
-    ]
-
-    HD_PAYMENT_STATUS_CHOICES = [
-        ('pending', 'Pending'),
-        ('done', 'Done')
-    ]
-
     plan = models.ForeignKey('Plan', on_delete=models.CASCADE, related_name='domain_hostings')
-    client_name = models.CharField(max_length=100, blank=True, null=True)
-    phone_number = models.CharField(max_length=20, blank=True, null=True)
-    email = models.EmailField(blank=True, null=True)
+    client = models.ForeignKey('CustomUser', on_delete=models.SET_NULL, null=True, blank=True, related_name='domain_hostings')  # FK here
+
     assigned_to = models.CharField(max_length=100, blank=True, null=True)
     domain_name = models.CharField(max_length=100, blank=True, null=True)
     domain_provider = models.CharField(max_length=100, blank=True, null=True)
@@ -158,14 +140,14 @@ class DomainHosting(models.Model):
 
     status = models.CharField(
         max_length=10,
-        choices=STATUS_CHOICES,
+        choices=[('running', 'Running'), ('expired', 'Expired'), ('expiring', 'Expiring')],
         default='running',
     )
 
     hd_payment_status = models.CharField(
         max_length=15,
-        choices=HD_PAYMENT_STATUS_CHOICES,
-        default='pending',  # ⬅️ Change this from 'done' to 'pending'
+        choices=[('pending', 'Pending'), ('done', 'Done')],
+        default='pending',
     )
 
     def save(self, *args, **kwargs):
@@ -177,7 +159,6 @@ class DomainHosting(models.Model):
             except ValueError:
                 raise ValueError("Invalid date format for hosting_expiry. Expected YYYY-MM-DD.")
 
-        # Set only the status — no longer touch hd_payment_status
         if self.hosting_expiry:
             if self.hosting_expiry < today:
                 self.status = 'expired'
@@ -187,10 +168,6 @@ class DomainHosting(models.Model):
                 self.status = 'running'
 
         super().save(*args, **kwargs)
-
-
-
-
 
 
 
@@ -215,9 +192,7 @@ class PaymentRequest(models.Model):
 
 
 class Workspace(models.Model):
-    client_name = models.CharField(max_length=255, null=True, blank=True)
-    phone_number = models.CharField(max_length=20, null=True, blank=True)
-    email = models.EmailField(null=True, blank=True)
+    client = models.ForeignKey(CustomUser, null=True, blank=True, on_delete=models.SET_NULL, related_name='workspace')
     workspace_name = models.CharField(max_length=255)
     description = models.TextField()
     assign_staff = models.CharField(max_length=255)

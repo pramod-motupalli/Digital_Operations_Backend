@@ -64,7 +64,8 @@ urlpatterns = [
     path('<int:pk>/activate/', activate_workspace, name='activate-workspace'),
     path('workspaces/create/', WorkspaceCreateAPIView.as_view(), name='create-workspace'),
     path('workspaces/create/<int:pk>/', WorkspaceCreateAPIView.as_view(), name='workspace-update'),
-    path('domain-hosting/', DomainHostingView.as_view(), name='domain-hosting'),
+    path('domain-hosting/', DomainHostingView.as_view(), name='domain-hosting-list'),
+    path('domain-hosting/<int:pk>/', DomainHostingView.as_view(), name='domain-hosting-detail'),
 
 
 
@@ -74,9 +75,7 @@ urlpatterns = [
     # Task URLs for a specific workspace
     path('workspaces/<int:workspace_id>/tasks/', WorkspaceTaskListCreateView.as_view(), name='workspace-tasks-list-create'),
     path('assign-spoc/', AssignSpocView.as_view(), name='assign-spoc'),
-    path('domain-hosting/<int:pk>/', DomainHostingView.as_view(), name='domain-hosting-detail'),
     path('team-leads/no-spoc/', team_leads_list_no_spoc, name='team-leads-no-spoc'),
     path('staff-members/', staff_members_list, name='staff-members-list'),
-    path('hey/', get_logged_in_client, name = 'get_logged_in_client'),
-
+    path('details/',get_logged_in_client.as_view(), name='get_logged_in_client'),
 ]

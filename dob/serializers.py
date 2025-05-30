@@ -386,21 +386,33 @@ class PlanSerializer(serializers.ModelSerializer):
 
 
 
+
+class ClientUserSerializer(serializers.ModelSerializer):
+    contact_number = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CustomUser
+        fields = ['username', 'email', 'contact_number']
+
+    def get_contact_number(self, obj):
+        try:
+            return obj.client_profile.contact_number
+        except ClientProfile.DoesNotExist:
+            return None
+
+
+
 # 🔟 Domain Hosting Serializer
 # serializers.py
 
 class DomainHostingSerializer(serializers.ModelSerializer):
     plan_title = serializers.CharField(source='plan.title', read_only=True)
     plan_price = serializers.DecimalField(source='plan.price', max_digits=10, decimal_places=2, read_only=True)
-
+    client = ClientUserSerializer(read_only=True)
     class Meta:
         model = DomainHosting
         fields = '__all__'  # ✅ Keeps compatibility with other frontends
-        read_only_fields = ['plan_title', 'plan_price', 'client_name', 'phone_number', 'email']
-    def get_plan_price(self, obj):
-        if obj.plan and obj.plan.price:
-            return float(obj.plan.price)
-        return None
+        read_only_fields = ['plan_title', 'plan_price', 'client']
 
 
 # 1️⃣1️⃣ Plan Request Serializer

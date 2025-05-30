@@ -466,38 +466,45 @@ def team_leads_list_no_spoc(request):
     
     return JsonResponse(list(leads), safe=False)
 
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated  # change to AllowAny if needed
+
+from .models import Plan, DomainHosting, PlanRequest
+from .serializers import PlanSerializer
+
 class SubmissionView(APIView):
-    permission_classes = [AllowAny]  # Require login
+    permission_classes = [IsAuthenticated]  # Requires user to be logged in
 
     def post(self, request):
         try:
             user = request.user
-            profile = getattr(user, 'client_profile', None)
+
+            # Extract data from request
             title = request.data.get('title')
             billing = request.data.get('billing')
             features = request.data.get('features')
             price = request.data.get('price')
             domain_hosting = request.data.get('domain_hosting')
-            domain = None  # Default if domain is not created
+            domain = None
 
-            # Create Plan with user info
+            # ✅ Create Plan linked to client (FK only)
             plan = Plan.objects.create(
                 title=title,
                 price=price,
                 billing=billing,
                 features=features,
-                client_name=f"{user.first_name} {user.last_name}",
-                phone_number=profile.contact_number if profile else '',
-                email=user.email,                
+                client=user  # FK only
             )
 
-            # Create PlanRequest if plan is a customization
+            # ✅ Create PlanRequest if customization
             if title and title.lower() == "plan customization":
                 PlanRequest.objects.create(plan=plan)
 
-            # Check if any domain hosting field is filled
+            # ✅ If domain hosting info is present, store it
             if domain_hosting and isinstance(domain_hosting, dict):
-                important_fields = [
+                required_fields = [
                     domain_hosting.get('domainName'),
                     domain_hosting.get('domainProvider'),
                     domain_hosting.get('domainAccount'),
@@ -505,13 +512,10 @@ class SubmissionView(APIView):
                     domain_hosting.get('hostingProvider'),
                     domain_hosting.get('hostingProviderName'),
                     domain_hosting.get('hostingExpiry'),
-                    domain_hosting.get('clientName'),
-                    domain_hosting.get('phoneNumber'),
-                    domain_hosting.get('email'),
                     domain_hosting.get('assignedTo'),
                 ]
 
-                if any(f for f in important_fields if f and str(f).strip()):
+                if any(f and str(f).strip() for f in required_fields):
                     domain = DomainHosting.objects.create(
                         plan=plan,
                         domain_name=domain_hosting.get('domainName', ''),
@@ -521,10 +525,8 @@ class SubmissionView(APIView):
                         hosting_provider=domain_hosting.get('hostingProvider', ''),
                         hosting_provider_name=domain_hosting.get('hostingProviderName', ''),
                         hosting_expiry=domain_hosting.get('hostingExpiry'),
-                        client_name=f"{user.first_name} {user.last_name}",
-                        phone_number=profile.contact_number if profile else '',
-                        email=user.email,
                         assigned_to=domain_hosting.get('assignedTo'),
+                        client=user  # FK only
                     )
 
             return Response({
@@ -539,7 +541,8 @@ class SubmissionView(APIView):
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def get(self, request):
-        plans = Plan.objects.all()
+        # Optional: only return plans belonging to the logged-in client
+        plans = Plan.objects.filter(client=request.user)
         serializer = PlanSerializer(plans, many=True)
         return Response(serializer.data)
 
@@ -838,17 +841,44 @@ class AssignSpocView(APIView):
         except (CustomUser.DoesNotExist, TeamLeadProfile.DoesNotExist):
             return Response({"error": "Team Lead not found"}, status=status.HTTP_404_NOT_FOUND)
         
-@api_view(['GET'])
-@permission_classes([AllowAny])
-def get_logged_in_client(request):
-    user = request.user
-    profile = getattr(user, 'client_profile', None)
-    return Response({
-        'id': user.id,
-        'email': user.email,
-        'username': user.username,
-        'first_name': user.first_name,
-        'last_name': user.last_name,
-        'phone_number': profile.contact_number if profile else '',
-        'company_name': profile.company_name if profile else '',
-    })
+# @api_view(['GET'])
+# @permission_classes([AllowAny])
+# def get_logged_in_client(request):
+#     user = request.user
+#     profile = getattr(user, 'client_profile', None)
+#     return Response({
+#         'id': user.id,
+#         'email': user.email,
+#         'username': user.username,
+#         'first_name': user.first_name,
+#         'last_name': user.last_name,
+#         'phone_number': profile.contact_number if profile else '',
+#         'company_name': profile.company_name if profile else '',
+#     })
+
+from dob.models import ClientProfile  # Make sure this import exists
+
+class get_logged_in_client(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        user = request.user
+        response_data = {
+            "id": user.id,
+            "email": user.email,
+            "role": user.role,
+            "name": user.get_full_name(),
+        }
+
+        if user.role == CustomUser.ROLE_CLIENT:
+            try:
+                client_profile = user.client_profile  # reverse relation
+                response_data.update({
+                    "company_name": client_profile.company_name,
+                    "phone_number": client_profile.contact_number,
+                })
+            except ClientProfile.DoesNotExist:
+                pass  # or return a 404/empty profile
+
+        return Response(response_data)
+
