@@ -444,55 +444,69 @@ class ResetPasswordView(APIView):
 
 
 @api_view(['GET'])
-@permission_classes([AllowAny]) 
+@permission_classes([AllowAny])
 def team_leads_list(request):
-    leads = CustomUser.objects.filter(role='team_lead').values_list('username', flat=True)
+    leads = CustomUser.objects.filter(role='team_lead').values('id', 'username')
     return JsonResponse(list(leads), safe=False)
 
+
 @api_view(['GET'])
-@permission_classes([AllowAny]) 
+@permission_classes([AllowAny])
 def staff_members_list(request):
-    leads = CustomUser.objects.filter(role='team_member').values_list('username', flat=True)
+    leads = CustomUser.objects.filter(role='team_member').values('id', 'username')
     return JsonResponse(list(leads), safe=False)
 
 
 @api_view(['GET'])
-@permission_classes([AllowAny])  # Explicitly allows public access
+@permission_classes([AllowAny])
 def team_leads_list_no_spoc(request):
     leads = CustomUser.objects.filter(
         role='team_lead',
-        teamlead_profile__is_spoc=False  # Correct use of related_name
-    ).values_list('username', flat=True)
+        teamlead_profile__is_spoc=False
+    ).values('id', 'username')
     
     return JsonResponse(list(leads), safe=False)
 
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated  # change to AllowAny if needed
+
+from .models import Plan, DomainHosting, PlanRequest
+from .serializers import PlanSerializer
+
 class SubmissionView(APIView):
-    permission_classes = [AllowAny]  # Require login
+    permission_classes = [IsAuthenticated]  # Requires user to be logged in
 
     def post(self, request):
         try:
+            user = request.user
+
+            # Extract data from request
             title = request.data.get('title')
             billing = request.data.get('billing')
             features = request.data.get('features')
             price = request.data.get('price')
             domain_hosting = request.data.get('domain_hosting')
-            domain = None  # Default if domain is not created
+            domain = None
 
-            # Create Plan with user info
+            # ✅ Create Plan linked to client (FK only)
             plan = Plan.objects.create(
                 title=title,
                 price=price,
                 billing=billing,
-                features=features
+                features=features,
+                client=user  # FK only
             )
 
-            # Create PlanRequest if plan is a customization
+            # ✅ Create PlanRequest if customization
             if title and title.lower() == "plan customization":
                 PlanRequest.objects.create(plan=plan)
 
-            # Check if any domain hosting field is filled
+            # ✅ If domain hosting info is present, store it
             if domain_hosting and isinstance(domain_hosting, dict):
-                important_fields = [
+                required_fields = [
                     domain_hosting.get('domainName'),
                     domain_hosting.get('domainProvider'),
                     domain_hosting.get('domainAccount'),
@@ -500,13 +514,10 @@ class SubmissionView(APIView):
                     domain_hosting.get('hostingProvider'),
                     domain_hosting.get('hostingProviderName'),
                     domain_hosting.get('hostingExpiry'),
-                    domain_hosting.get('clientName'),
-                    domain_hosting.get('phoneNumber'),
-                    domain_hosting.get('email'),
                     domain_hosting.get('assignedTo'),
                 ]
 
-                if any(f for f in important_fields if f and str(f).strip()):
+                if any(f and str(f).strip() for f in required_fields):
                     domain = DomainHosting.objects.create(
                         plan=plan,
                         domain_name=domain_hosting.get('domainName', ''),
@@ -516,10 +527,8 @@ class SubmissionView(APIView):
                         hosting_provider=domain_hosting.get('hostingProvider', ''),
                         hosting_provider_name=domain_hosting.get('hostingProviderName', ''),
                         hosting_expiry=domain_hosting.get('hostingExpiry'),
-                        client_name=domain_hosting.get('clientName'),
-                        phone_number=domain_hosting.get('phoneNumber'),
-                        email=domain_hosting.get('email'),
                         assigned_to=domain_hosting.get('assignedTo'),
+                        client=user  # FK only
                     )
 
             return Response({
@@ -534,36 +543,68 @@ class SubmissionView(APIView):
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def get(self, request):
-        plans = Plan.objects.all()
+        # Optional: only return plans belonging to the logged-in client
+        plans = Plan.objects.filter(client=request.user)
         serializer = PlanSerializer(plans, many=True)
         return Response(serializer.data)
 
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import AllowAny
+from .models import DomainHosting
+from .serializers import DomainHostingSerializer
+
 class DomainHostingView(APIView):
     permission_classes = [AllowAny]
+
     def get(self, request):
         domain_hostings = DomainHosting.objects.all()
         serializer = DomainHostingSerializer(domain_hostings, many=True)
         return Response(serializer.data)
+
     def patch(self, request, pk=None):
         try:
-            # Get the ID from the URL
             domain_hosting = DomainHosting.objects.get(id=pk)
-            status_value = request.data.get("status")
+            data = {}
 
-            if status_value:
-                domain_hosting.status = status_value
-                domain_hosting.save()
-                serializer = DomainHostingSerializer(domain_hosting)
+            # Handle H&D payment status
+            if "hd_payment_status" in request.data:
+                new_payment_status = request.data["hd_payment_status"]
+                if new_payment_status not in ["pending", "done"]:
+                    return Response({"error": "Invalid payment status."}, status=status.HTTP_400_BAD_REQUEST)
+                data["hd_payment_status"] = new_payment_status
+
+            # Handle status update
+            if "status" in request.data:
+                new_status = request.data["status"]
+                if new_status not in ["running", "expired", "expiring"]:
+                    return Response({"error": "Invalid status."}, status=status.HTTP_400_BAD_REQUEST)
+                data["status"] = new_status
+
+            # Handle domain expiry date update
+            if "domain_expiry" in request.data:
+                data["domain_expiry"] = request.data["domain_expiry"]
+
+            # Handle hosting expiry date update
+            if "hosting_expiry" in request.data:
+                data["hosting_expiry"] = request.data["hosting_expiry"]
+
+            if not data:
+                return Response({"error": "No valid fields provided"}, status=status.HTTP_400_BAD_REQUEST)
+
+            serializer = DomainHostingSerializer(domain_hosting, data=data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
                 return Response(serializer.data, status=status.HTTP_200_OK)
-            else:
-                return Response({"error": "No status provided"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         except DomainHosting.DoesNotExist:
             return Response({"error": "DomainHosting not found"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def approve_payment(request, plan_id):
@@ -670,10 +711,10 @@ class PaymentRequestView(APIView):
                 plan_request.plan.price = price
                 plan_request.plan.save()
 
-            # ✅ Save price to PaymentRequest model as well
+            #Save price to PaymentRequest model as well
             payment_request = PaymentRequest.objects.create(
                 plan_request=plan_request,
-                price=price  # ✅ explicitly save it
+                price=price  #explicitly save it
             )
 
             serializer = PaymentRequestSerializer(payment_request)
@@ -791,27 +832,99 @@ class WorkspaceTaskListCreateView(APIView):
 
 
 class AssignSpocView(APIView):
-    
-
     permission_classes = [AllowAny]
 
     def post(self, request):
-        print("Authenticated user:", request.user)
-        print("Is authenticated:", request.user.is_authenticated)
-        username = request.data.get("username")
+        user_id = request.data.get("id")
         try:
-            user = CustomUser.objects.get(username=username)
+            user = CustomUser.objects.get(id=user_id)
             teamlead_profile = TeamLeadProfile.objects.get(user=user)
             teamlead_profile.is_spoc = True
             teamlead_profile.save()
-            return Response({"message": f"{username} is now a SPOC"}, status=status.HTTP_200_OK)
+            return Response({"message": f"{user.username} is now a SPOC"}, status=status.HTTP_200_OK)
         except (CustomUser.DoesNotExist, TeamLeadProfile.DoesNotExist):
             return Response({"error": "Team Lead not found"}, status=status.HTTP_404_NOT_FOUND)
-        
-# class StaffListView(APIView):
-#     permission_classes = []
 
-#     def get(self, request):
-#         staff_members = StaffProfile.objects.select_related('user').all()
-#         serializer = StaffSerializer(staff_members, many=True)
-#         return Response(serializer.data)
+# @api_view(['GET'])
+# @permission_classes([AllowAny])
+# def get_logged_in_client(request):
+#     user = request.user
+#     profile = getattr(user, 'client_profile', None)
+#     return Response({
+#         'id': user.id,
+#         'email': user.email,
+#         'username': user.username,
+#         'first_name': user.first_name,
+#         'last_name': user.last_name,
+#         'phone_number': profile.contact_number if profile else '',
+#         'company_name': profile.company_name if profile else '',
+#     })
+
+from dob.models import ClientProfile  # Make sure this import exists
+
+class get_logged_in_client(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        user = request.user
+        response_data = {
+            "id": user.id,
+            "email": user.email,
+            "role": user.role,
+            "name": user.get_full_name(),
+        }
+
+        if user.role == CustomUser.ROLE_CLIENT:
+            try:
+                client_profile = user.client_profile  # reverse relation
+                response_data.update({
+                    "company_name": client_profile.company_name,
+                    "phone_number": client_profile.contact_number,
+                })
+            except ClientProfile.DoesNotExist:
+                pass  # or return a 404/empty profile
+
+        return Response(response_data)
+
+class WorkspaceTaskListCreateView(APIView):
+    ...
+    
+
+# 🔽 PASTE STARTING HERE
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from .models import Workspace
+from .serializers import WorkspaceSerializer
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def client_workspaces_view(request):
+    user = request.user
+    workspaces = Workspace.objects.filter(client=user)
+    serializer = WorkspaceSerializer(workspaces, many=True)
+    return Response(serializer.data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def spoc_workspaces_view(request):
+    user = request.user
+    workspaces = Workspace.objects.filter(assign_spoc=user)
+    serializer = WorkspaceSerializer(workspaces, many=True)
+    return Response(serializer.data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def hd_maintenance_workspaces_view(request):
+    user = request.user
+    workspaces = Workspace.objects.filter(hd_maintenance=user)
+    serializer = WorkspaceSerializer(workspaces, many=True)
+    return Response(serializer.data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def staff_workspaces_view(request):
+    user = request.user
+    workspaces = Workspace.objects.filter(assign_staff=user)
+    serializer = WorkspaceSerializer(workspaces, many=True)
+    return Response(serializer.data)

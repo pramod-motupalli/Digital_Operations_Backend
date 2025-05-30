@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from datetime import datetime, date, timedelta
 import uuid
 
 # ------------------- Custom User and Role Models -------------------
@@ -107,34 +108,27 @@ class Plan(models.Model):
     price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     billing = models.CharField(max_length=10, choices=[('monthly', 'Monthly'), ('yearly', 'Yearly')])
     features = models.JSONField()
-    client_name = models.CharField(CustomUser, max_length=255, null=True, blank=True)
-    phone_number = models.CharField(CustomUser, max_length=20, null=True, blank=True)
-    email = models.EmailField(CustomUser, null=True, blank=True)
+
+    client = models.ForeignKey('CustomUser', on_delete=models.SET_NULL, null=True, blank=True, related_name='plans')  # FK here
+
     payment_status = models.CharField(
         max_length=20,
         choices=[('Pending', 'Pending'), ('Done', 'Done'), ('Failed', 'Failed')],
         default='Done'
     )
-    
-    payment_is_approved = models.BooleanField(null=True, blank=True, default=None)  # NEW field
-    is_workspace_activated = models.BooleanField(null=True, blank=True, default=None) 
 
-    def _str_(self):
+    payment_is_approved = models.BooleanField(null=True, blank=True, default=None)
+    is_workspace_activated = models.BooleanField(null=True, blank=True, default=None)
+
+    def __str__(self):
         return f"{self.title} ({self.payment_status})"
 
 
 
 class DomainHosting(models.Model):
-    STATUS_CHOICES = [
-        ('running', 'Running'),
-        ('expired', 'Expired'),
-        ('expiring', 'Expiring')
-    ]
+    plan = models.ForeignKey('Plan', on_delete=models.CASCADE, related_name='domain_hostings')
+    client = models.ForeignKey('CustomUser', on_delete=models.SET_NULL, null=True, blank=True, related_name='domain_hostings')  # FK here
 
-    plan = models.ForeignKey(Plan, on_delete=models.CASCADE, related_name='domain_hostings')
-    client_name = models.CharField(max_length=100, blank=True, null=True)
-    phone_number = models.CharField(max_length=20, blank=True, null=True)
-    email = models.EmailField(blank=True, null=True)
     assigned_to = models.CharField(max_length=100, blank=True, null=True)
     domain_name = models.CharField(max_length=100, blank=True, null=True)
     domain_provider = models.CharField(max_length=100, blank=True, null=True)
@@ -144,15 +138,37 @@ class DomainHosting(models.Model):
     hosting_provider_name = models.CharField(max_length=100, blank=True, null=True)
     hosting_expiry = models.DateField(blank=True, null=True)
 
-    # ✅ New status field
     status = models.CharField(
         max_length=10,
-        choices=STATUS_CHOICES,
+        choices=[('running', 'Running'), ('expired', 'Expired'), ('expiring', 'Expiring')],
         default='running',
     )
 
-    def __str__(self):
-        return f"{self.client_name} - {self.domain_name}"
+    hd_payment_status = models.CharField(
+        max_length=15,
+        choices=[('pending', 'Pending'), ('done', 'Done')],
+        default='pending',
+    )
+
+    def save(self, *args, **kwargs):
+        today = date.today()
+
+        if isinstance(self.hosting_expiry, str):
+            try:
+                self.hosting_expiry = datetime.strptime(self.hosting_expiry, "%Y-%m-%d").date()
+            except ValueError:
+                raise ValueError("Invalid date format for hosting_expiry. Expected YYYY-MM-DD.")
+
+        if self.hosting_expiry:
+            if self.hosting_expiry < today:
+                self.status = 'expired'
+            elif self.hosting_expiry <= today + timedelta(days=30):
+                self.status = 'expiring'
+            else:
+                self.status = 'running'
+
+        super().save(*args, **kwargs)
+
 
 
 class PlanRequest(models.Model):
@@ -176,13 +192,12 @@ class PaymentRequest(models.Model):
 
 
 class Workspace(models.Model):
-    client_name = models.CharField(max_length=255, null=True, blank=True)
-    phone_number = models.CharField(max_length=20, null=True, blank=True)
-    email = models.EmailField(null=True, blank=True)
+    client = models.ForeignKey(CustomUser, null=True, blank=True, on_delete=models.CASCADE, related_name='workspace')
     workspace_name = models.CharField(max_length=255)
     description = models.TextField()
-    assign_staff = models.CharField(max_length=255)
-    hd_maintenance = models.CharField(max_length=255)
+    assign_staff = models.ForeignKey(CustomUser, related_name='assigned_staff', on_delete=models.CASCADE, null=True, blank=True)
+    assign_spoc = models.ForeignKey(CustomUser, related_name='assigned_spoc', on_delete=models.CASCADE, null=True, blank=True)
+    hd_maintenance = models.ForeignKey(CustomUser, related_name='assigned_hd', on_delete=models.CASCADE, null=True, blank=True)
     is_workspace_activated = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
