@@ -192,12 +192,12 @@ class PaymentRequest(models.Model):
 
 
 class Workspace(models.Model):
-    client = models.ForeignKey(CustomUser, null=True, blank=True, on_delete=models.SET_NULL, related_name='workspace')
+    client = models.ForeignKey(CustomUser, null=True, blank=True, on_delete=models.CASCADE, related_name='workspace')
     workspace_name = models.CharField(max_length=255)
     description = models.TextField()
-    assign_spoc = models.CharField(max_length=255, blank=True, null=True)
-    assign_staff = models.CharField(max_length=255)
-    hd_maintenance = models.CharField(max_length=255)
+    assign_staff = models.ForeignKey(CustomUser, related_name='assigned_staff', on_delete=models.CASCADE, null=True, blank=True)
+    assign_spoc = models.ForeignKey(CustomUser, related_name='assigned_spoc', on_delete=models.CASCADE, null=True, blank=True)
+    hd_maintenance = models.ForeignKey(CustomUser, related_name='assigned_hd', on_delete=models.CASCADE, null=True, blank=True)
     is_workspace_activated = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 

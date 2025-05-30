@@ -444,27 +444,29 @@ class ResetPasswordView(APIView):
 
 
 @api_view(['GET'])
-@permission_classes([AllowAny]) 
+@permission_classes([AllowAny])
 def team_leads_list(request):
-    leads = CustomUser.objects.filter(role='team_lead').values_list('username', flat=True)
-    return JsonResponse(list(leads), safe=False)
-
-@api_view(['GET']) 
-@permission_classes([AllowAny]) 
-def staff_members_list(request):
-    leads = CustomUser.objects.filter(role='team_member').values_list('username', flat=True)
+    leads = CustomUser.objects.filter(role='team_lead').values('id', 'username')
     return JsonResponse(list(leads), safe=False)
 
 
 @api_view(['GET'])
-@permission_classes([AllowAny])  # Explicitly allows public access
+@permission_classes([AllowAny])
+def staff_members_list(request):
+    leads = CustomUser.objects.filter(role='team_member').values('id', 'username')
+    return JsonResponse(list(leads), safe=False)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
 def team_leads_list_no_spoc(request):
     leads = CustomUser.objects.filter(
         role='team_lead',
-        teamlead_profile__is_spoc=False  # Correct use of related_name
-    ).values_list('username', flat=True)
+        teamlead_profile__is_spoc=False
+    ).values('id', 'username')
     
     return JsonResponse(list(leads), safe=False)
+
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -831,16 +833,16 @@ class AssignSpocView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        username = request.data.get("username")
+        user_id = request.data.get("id")
         try:
-            user = CustomUser.objects.get(username=username)
+            user = CustomUser.objects.get(id=user_id)
             teamlead_profile = TeamLeadProfile.objects.get(user=user)
             teamlead_profile.is_spoc = True
             teamlead_profile.save()
-            return Response({"message": f"{username} is now a SPOC"}, status=status.HTTP_200_OK)
+            return Response({"message": f"{user.username} is now a SPOC"}, status=status.HTTP_200_OK)
         except (CustomUser.DoesNotExist, TeamLeadProfile.DoesNotExist):
             return Response({"error": "Team Lead not found"}, status=status.HTTP_404_NOT_FOUND)
-        
+
 # @api_view(['GET'])
 # @permission_classes([AllowAny])
 # def get_logged_in_client(request):
@@ -882,3 +884,45 @@ class get_logged_in_client(APIView):
 
         return Response(response_data)
 
+class WorkspaceTaskListCreateView(APIView):
+    ...
+    
+
+# 🔽 PASTE STARTING HERE
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from .models import Workspace
+from .serializers import WorkspaceSerializer
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def client_workspaces_view(request):
+    user = request.user
+    workspaces = Workspace.objects.filter(client=user)
+    serializer = WorkspaceSerializer(workspaces, many=True)
+    return Response(serializer.data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def spoc_workspaces_view(request):
+    user = request.user
+    workspaces = Workspace.objects.filter(assign_spoc=user)
+    serializer = WorkspaceSerializer(workspaces, many=True)
+    return Response(serializer.data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def hd_maintenance_workspaces_view(request):
+    user = request.user
+    workspaces = Workspace.objects.filter(hd_maintenance=user)
+    serializer = WorkspaceSerializer(workspaces, many=True)
+    return Response(serializer.data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def staff_workspaces_view(request):
+    user = request.user
+    workspaces = Workspace.objects.filter(assign_staff=user)
+    serializer = WorkspaceSerializer(workspaces, many=True)
+    return Response(serializer.data)

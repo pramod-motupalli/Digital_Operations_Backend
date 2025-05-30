@@ -23,7 +23,7 @@ from .views import (
     AccountantAutoRegisterView,
     MarkIsVisitedView,TeamLeadListView, StaffListView, AccountantListView,
     PaymentRequestView,approve_payment,activate_workspace,WorkspaceCreateAPIView, DomainHostingView,WorkspaceListCreateView,WorkspaceTaskListCreateView,
-    WorkspaceDetailView, AssignSpocView,team_leads_list_no_spoc, staff_members_list, get_logged_in_client,
+    WorkspaceDetailView, AssignSpocView,team_leads_list_no_spoc, staff_members_list, get_logged_in_client, client_workspaces_view, spoc_workspaces_view, hd_maintenance_workspaces_view, staff_workspaces_view
 )
 
 urlpatterns = [
@@ -78,4 +78,8 @@ urlpatterns = [
     path('team-leads/no-spoc/', team_leads_list_no_spoc, name='team-leads-no-spoc'),
     path('staff-members/', staff_members_list, name='staff-members-list'),
     path('details/',get_logged_in_client.as_view(), name='get_logged_in_client'),
+    path('workspaces/client/', client_workspaces_view, name='client-workspaces'),
+    path('workspaces/spoc/', spoc_workspaces_view, name='spoc-workspaces'),
+    path('workspaces/hd/', hd_maintenance_workspaces_view, name='hd-workspaces'),
+    path('staff/', staff_workspaces_view, name='staff-workspaces'),
 ]

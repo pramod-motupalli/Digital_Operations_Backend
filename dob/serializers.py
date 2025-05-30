@@ -451,10 +451,13 @@ class PaymentRequestSerializer(serializers.ModelSerializer):
 
     
 class WorkspaceSerializer(serializers.ModelSerializer):
+    assign_staff = UserSerializer(read_only=True)
+    assign_spoc = UserSerializer(read_only=True)
+    hd_maintenance = UserSerializer(read_only=True)
+
     class Meta:
         model = Workspace
         fields = '__all__'
-        read_only_fields = ['created_at'] 
 
 class TaskSerializer(serializers.ModelSerializer):
     # Read-only fields set by the backend/db
