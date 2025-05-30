@@ -624,16 +624,18 @@ from .serializers import TeamLeadSerializer, StaffSerializer, AccountantSerializ
 
 
 class TeamLeadListView(generics.ListAPIView):
-    queryset = TeamLeadProfile.objects.all()
+    queryset = TeamLeadProfile.objects.select_related('user').all()
     serializer_class = TeamLeadSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [AllowAny]  # or IsAuthenticated if needed
 
 
-class StaffListView(generics.ListAPIView):
-    queryset = StaffProfile.objects.all()
-    serializer_class = StaffSerializer
-    permission_classes = [AllowAny]
+class StaffListView(APIView):
+    permission_classes = []
 
+    def get(self, request):
+        staff_profiles = StaffProfile.objects.select_related('user').all()
+        serializer = StaffSerializer(staff_profiles, many=True)
+        return Response(serializer.data)
 
 class AccountantListView(generics.ListAPIView):
     queryset = AccountantProfile.objects.all()
@@ -789,9 +791,13 @@ class WorkspaceTaskListCreateView(APIView):
 
 
 class AssignSpocView(APIView):
-    permission_classes = [IsAuthenticated]
+    
+
+    permission_classes = [AllowAny]
 
     def post(self, request):
+        print("Authenticated user:", request.user)
+        print("Is authenticated:", request.user.is_authenticated)
         username = request.data.get("username")
         try:
             user = CustomUser.objects.get(username=username)
@@ -801,3 +807,11 @@ class AssignSpocView(APIView):
             return Response({"message": f"{username} is now a SPOC"}, status=status.HTTP_200_OK)
         except (CustomUser.DoesNotExist, TeamLeadProfile.DoesNotExist):
             return Response({"error": "Team Lead not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+# class StaffListView(APIView):
+#     permission_classes = []
+
+#     def get(self, request):
+#         staff_members = StaffProfile.objects.select_related('user').all()
+#         serializer = StaffSerializer(staff_members, many=True)
+#         return Response(serializer.data)

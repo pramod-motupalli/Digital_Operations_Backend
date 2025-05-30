@@ -1,30 +1,5 @@
 from django.urls import path
-from .views import (
-    MyTokenObtainPairView,
-    UserMeView,
-    TokenRefreshView,
-    RegisterClientView,
-    VerifyEmailView,
-    ResendVerificationView,
-    SendResetPasswordEmailView,
-    VerifyForgotPasswordEmailView,
-    ResetPasswordView,
-    RegisterTeamLeadView,
-    SendVerificationEmailView,
-    ManagerCreateView,
-    RegisterStaffView,
-    StaffAutoRegisterView,
-    RegisterAccountantView,
-    team_leads_list,
-    SubmissionView,
-    get_or_update_requests,
-    PaymentRequestViewSet,
-    TeamLeadAutoRegisterView,
-    AccountantAutoRegisterView,
-    MarkIsVisitedView,TeamLeadListView, StaffListView, AccountantListView,
-    PaymentRequestView,approve_payment,activate_workspace,WorkspaceCreateAPIView, DomainHostingView,WorkspaceListCreateView,WorkspaceTaskListCreateView,
-    WorkspaceDetailView, AssignSpocView,team_leads_list_no_spoc, staff_members_list
-)
+from .views import *
 
 urlpatterns = [
     path('token/', MyTokenObtainPairView.as_view(), name='token_obtain_pair'),

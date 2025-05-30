@@ -41,6 +41,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework_simplejwt',
     "rest_framework",
+    # 'rest_framework',
+    'rest_framework.authtoken',
     "corsheaders",
 ]
 
@@ -164,6 +166,7 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # settings.py
 AUTHENTICATION_BACKENDS = ['django.contrib.auth.backends.ModelBackend']
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
