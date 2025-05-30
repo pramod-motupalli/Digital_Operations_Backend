@@ -377,14 +377,6 @@ class ResetPasswordSerializer(serializers.Serializer):
         return user
 
 
-# 9️⃣ Plan Serializer
-class PlanSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Plan
-        fields = '__all__'
-        read_only_fields = ['client_name', 'phone_number', 'email']
-
-
 
 
 class ClientUserSerializer(serializers.ModelSerializer):
@@ -402,9 +394,17 @@ class ClientUserSerializer(serializers.ModelSerializer):
 
 
 
-# 🔟 Domain Hosting Serializer
-# serializers.py
+# 9️⃣ Plan Serializer
+class PlanSerializer(serializers.ModelSerializer):
+    client = ClientUserSerializer(read_only=True)
 
+    class Meta:
+        model = Plan
+        fields = '__all__'
+        read_only_fields = ['client']
+
+
+# 🔟 Domain Hosting Serializer
 class DomainHostingSerializer(serializers.ModelSerializer):
     plan_title = serializers.CharField(source='plan.title', read_only=True)
     plan_price = serializers.DecimalField(source='plan.price', max_digits=10, decimal_places=2, read_only=True)
@@ -417,34 +417,19 @@ class DomainHostingSerializer(serializers.ModelSerializer):
 
 # 1️⃣1️⃣ Plan Request Serializer
 class PlanRequestSerializer(serializers.ModelSerializer):
-    client_name = serializers.SerializerMethodField()
-    client_email = serializers.SerializerMethodField()
-    client_phone = serializers.SerializerMethodField()
-    plan_title = serializers.CharField(source='plan.title')
+    plan_title = serializers.CharField(source='plan.title', read_only=True)
+    plan_features = serializers.JSONField(source='plan.features', read_only=True)
+    client = ClientUserSerializer(read_only=True)
     plan_price = serializers.SerializerMethodField()
-    plan_features = serializers.JSONField(source='plan.features')
-
-    def get_client_name(self, obj):
-        return obj.client.username if obj.client else 'Unknown'
-
-    def get_client_email(self, obj):
-        return obj.client.email if obj.client else 'N/A'
-
-    def get_client_phone(self, obj):
-        try:
-            return obj.client.client_profile.contact_number
-        except:
-            return 'N/A'
-        
-    def get_plan_price(self, obj):
-        return obj.get_price()
 
     class Meta:
         model = PlanRequest
-        fields = [
-            'id', 'client_name', 'client_email', 'client_phone',
-            'plan_title', 'plan_price', 'plan_features', 'overridden_price'
-        ]
+        fields = '__all__'
+        read_only_fields = ['plan_title', 'plan_features', 'client']
+
+    def get_plan_price(self, obj):
+        return obj.get_price()
+
 
 
 # 1️⃣2️⃣ Payment Request Serializer

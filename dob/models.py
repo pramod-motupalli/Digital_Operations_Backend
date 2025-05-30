@@ -195,6 +195,7 @@ class Workspace(models.Model):
     client = models.ForeignKey(CustomUser, null=True, blank=True, on_delete=models.SET_NULL, related_name='workspace')
     workspace_name = models.CharField(max_length=255)
     description = models.TextField()
+    assign_spoc = models.CharField(max_length=255, blank=True, null=True)
     assign_staff = models.CharField(max_length=255)
     hd_maintenance = models.CharField(max_length=255)
     is_workspace_activated = models.BooleanField(default=False)
