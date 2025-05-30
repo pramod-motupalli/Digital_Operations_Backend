@@ -56,5 +56,5 @@ urlpatterns = [
     path('workspaces/client/', client_workspaces_view, name='client-workspaces'),
     path('workspaces/spoc/', spoc_workspaces_view, name='spoc-workspaces'),
     path('workspaces/hd/', hd_maintenance_workspaces_view, name='hd-workspaces'),
-    path('staff/', staff_workspaces_view, name='staff-workspaces'),
+    path('workspaces/staff/', staff_workspaces_view, name='staff-workspaces'),
 ]
