@@ -204,14 +204,33 @@ class Workspace(models.Model):
     def __str__(self):
         return self.workspace_name
     
+from django.conf import settings
+
 class Task(models.Model):
     workspace = models.ForeignKey(
-        'Workspace', 
-        on_delete=models.CASCADE, 
+        'Workspace',
+        on_delete=models.CASCADE,
         related_name='tasks'
     )
+
+    domain_hosting = models.ForeignKey(
+        'DomainHosting',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='tasks'
+    )
+
+    # NEW: Link to ClientProfile
+    client = models.ForeignKey(
+        'ClientProfile',  
+        on_delete=models.CASCADE,
+        related_name='tasks'
+    )
+
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
+
     status = models.CharField(
         max_length=50,
         choices=[
@@ -221,8 +240,39 @@ class Task(models.Model):
         ],
         default='pending'
     )
+
     due_date = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.title
+    
+class WorkItem(models.Model):
+    title = models.CharField(max_length=100)
+    current_step_index = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+class WorkflowStep(models.Model):
+    STATUS_CHOICES = [
+        ('backlog', 'Backlog'),
+        ('todo', 'To Do'),
+        ('processing', 'Processing'),
+        ('review', 'Under Review'),
+        ('done', 'Done'),
+    ]
+
+    REVIEW_STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('redo', 'Redo Required'),
+        ('completed', 'Review Completed'),
+    ]
+
+    work_item = models.ForeignKey(WorkItem, related_name='workflow_steps', on_delete=models.CASCADE)
+    role = models.CharField(max_length=50)
+    user = models.ForeignKey(CustomUser, null=True, on_delete=models.SET_NULL)
+    order = models.IntegerField()
+    
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='backlog')
+    review_status = models.CharField(max_length=20, choices=REVIEW_STATUS_CHOICES, null=True, blank=True)
+
+    completed_at = models.DateTimeField(null=True, blank=True)

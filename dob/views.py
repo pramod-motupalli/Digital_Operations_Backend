@@ -13,23 +13,7 @@ from django.conf import settings
 from django.shortcuts import redirect, get_object_or_404
 from django.http import JsonResponse
 from dob.models import CustomUser, Plan, DomainHosting, PlanRequest, PaymentRequest, Workspace
-from .serializers import (
-    ClientRegistrationSerializer,
-    TokenRefreshSerializer,
-    MyTokenObtainPairSerializer,
-    ResetPasswordSerializer,
-    TeamLeadRegistrationSerializer,
-    ManagerProfileSerializer,
-    StaffRegistrationSerializer,
-    AccountantRegistrationSerializer,
-    TeamLeadAutoRegistrationSerializer,
-    PlanSerializer,
-    DomainHostingSerializer,
-    PlanRequestSerializer,
-    PaymentRequestSerializer,
-    CustomUserVisitedSerializer,
-    WorkspaceSerializer,
-)
+from .serializers import *
 from .emails import send_email_verification_link
 import uuid
 
@@ -851,8 +835,8 @@ class get_logged_in_client(APIView):
 
         return Response(response_data)
 
-class WorkspaceTaskListCreateView(APIView):
-    ...
+# class WorkspaceTaskListCreateView(APIView):
+#     ...
     
 
 # 🔽 PASTE STARTING HERE
@@ -893,3 +877,29 @@ def staff_workspaces_view(request):
     workspaces = Workspace.objects.filter(assign_staff=user)
     serializer = WorkspaceSerializer(workspaces, many=True)
     return Response(serializer.data)
+
+# your_app/views.py
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from .models import Task
+from .serializers import TaskDetailSerializer # Import your serializer
+
+class SPOCTaskListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        spoc_user = request.user
+
+        tasks = Task.objects.filter(
+            workspace__assign_spoc=spoc_user
+        ).select_related(
+            'workspace',
+            'domain_hosting',
+            'client',
+            'client__user'  # needed for first_name, last_name
+        )
+
+        serializer = TaskDetailSerializer(tasks, many=True)
+        return Response(serializer.data)
