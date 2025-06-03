@@ -251,6 +251,8 @@ class WorkItem(models.Model):
     title = models.CharField(max_length=100)
     current_step_index = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
+    client = models.ForeignKey('ClientProfile', on_delete=models.CASCADE, related_name='work_items')
+    domain_hosting = models.ForeignKey('DomainHosting', on_delete=models.CASCADE, related_name='work_items')
 
 class WorkflowStep(models.Model):
     STATUS_CHOICES = [
