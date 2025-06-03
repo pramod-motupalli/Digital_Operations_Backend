@@ -226,3 +226,32 @@ class Task(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class WorkItem(models.Model):
+    title = models.CharField(max_length=100)
+    current_step_index = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+class WorkflowStep(models.Model):
+    STATUS_CHOICES = [
+        ('backlog', 'Backlog'),
+        ('todo', 'To Do'),
+        ('processing', 'Processing'),
+        ('review', 'Under Review'),
+        ('done', 'Done'),
+    ]
+
+    REVIEW_STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('redo', 'Redo Required'),
+        ('completed', 'Review Completed'),
+    ]
+
+    work_item = models.ForeignKey(Task, related_name='workflow_steps', on_delete=models.CASCADE)
+    role = models.CharField(max_length=50)
+    user = models.ForeignKey(CustomUser, null=True, on_delete=models.SET_NULL)
+    order = models.IntegerField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='backlog')
+    review_status = models.CharField(max_length=20, choices=REVIEW_STATUS_CHOICES, null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
