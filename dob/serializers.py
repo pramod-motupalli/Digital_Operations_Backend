@@ -491,18 +491,13 @@ from rest_framework import serializers
 from .models import Task
 
 class TaskDetailSerializer(serializers.ModelSerializer):
-    workspace_name = serializers.SerializerMethodField()
-    domain_name = serializers.SerializerMethodField()
-    client_name = serializers.SerializerMethodField()
+    workspace_id = serializers.ReadOnlyField(source='workspace.id')
+    workspace_name = serializers.ReadOnlyField(source='workspace.workspace_name')
 
     class Meta:
         model = Task
-        fields = [
-            'id', 'title', 'description', 'status', 'due_date', 'created_at',
-            'workspace', 'workspace_name',
-            'domain_hosting', 'domain_name',
-            'client_name'
-        ]
+        fields = ['id', 'workspace', 'workspace_id', 'workspace_name', 'title', 'description', 'status', 'created_at']
+        read_only_fields = ['workspace', 'workspace_id', 'workspace_name', 'status', 'created_at']
 
     def get_workspace_name(self, obj):
         return getattr(obj.workspace, 'name', None)

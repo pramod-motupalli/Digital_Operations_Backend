@@ -792,8 +792,7 @@ class WorkspaceTaskListCreateView(APIView):
             return Response(TaskSerializer(task).data, status=status.HTTP_201_CREATED)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
+    
 class AssignSpocView(APIView):
     permission_classes = [AllowAny]
 

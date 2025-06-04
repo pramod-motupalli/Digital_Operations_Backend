@@ -73,6 +73,11 @@ class StaffProfile(models.Model):
     def __str__(self):
         return f"StaffProfile({self.user.username})"
 
+    @property
+    def tasks(self):
+        return self.assigned_tasks.all()
+
+
 
 class AccountantProfile(models.Model):
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
@@ -221,11 +226,28 @@ class Task(models.Model):
         related_name='tasks'
     )
 
-    # NEW: Link to ClientProfile
     client = models.ForeignKey(
-        'ClientProfile',  
+        'ClientProfile',
         on_delete=models.CASCADE,
         related_name='tasks'
+    )
+
+    assigned_to = models.ForeignKey(
+        'StaffProfile',  # or 'StaffProfile' depending on your design
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_tasks'
+    )
+
+    flow_or_hours = models.CharField(  # This can be renamed based on your real need
+        max_length=255,
+        blank=True
+    )
+
+    workhours = models.FloatField(  # Use IntegerField if you expect only whole hours
+        null=True,
+        blank=True
     )
 
     title = models.CharField(max_length=255)
@@ -235,8 +257,8 @@ class Task(models.Model):
         max_length=50,
         choices=[
             ('pending', 'Pending'),
-            ('in_progress', 'In Progress'),
-            ('completed', 'Completed'),
+            ('in_scope', 'In Scope'),
+            ('out_of_scope', 'Out of Scope'),
         ],
         default='pending'
     )
