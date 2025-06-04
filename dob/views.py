@@ -150,10 +150,10 @@ class StaffAutoRegisterView(APIView):
     def post(self, request):
         data = request.data.copy()
 
-        name = data.get('name')
+        name = data.get('username')
         email = data.get('email')
         designation = data.get('designation')
-        team_lead_username = data.get('team_lead') or data.get('teamLead')
+        team_lead_username = data.get('team_lead_id') or data.get('teamLead')
         print(name,email,designation,team_lead_username)
         if not all([name, email, designation, team_lead_username]):
             return Response({'error': 'Missing required fields.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -771,27 +771,43 @@ class WorkspaceTaskListCreateView(APIView):
     """
 
     def get(self, request, workspace_id):
-        """
-        List tasks for the given workspace ID.
-        """
         workspace = get_object_or_404(Workspace, id=workspace_id)
         tasks = Task.objects.filter(workspace=workspace).order_by('-created_at')
         serializer = TaskSerializer(tasks, many=True)
         return Response(serializer.data)
 
-    def post(self, request, workspace_id):
-        """
-        Create a new task for the given workspace.
-        Expects: { "title": "...", "description": "..." }
-        """
-        workspace = get_object_or_404(Workspace, id=workspace_id)
-        serializer = TaskSerializer(data=request.data)
 
+    def post(self, request, workspace_id):
+    # Get workspace
+        workspace = get_object_or_404(Workspace, id=workspace_id)
+
+        # Get client user from workspace
+        client_user = workspace.client
+
+        # Optional: Get client profile if needed
+        try:
+            client_profile = client_user.client_profile
+        except ClientProfile.DoesNotExist:
+            return Response({"error": "Client profile not found for this workspace."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Get DomainHosting using client_user (CustomUser)
+        domain_hosting = DomainHosting.objects.filter(client=client_user).first()
+        if not domain_hosting:
+            return Response({"error": "No domain hosting found for this client."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Save task with workspace, client_profile, and domain_hosting
+        serializer = TaskSerializer(data=request.data)
         if serializer.is_valid():
-            task = serializer.save(workspace=workspace)
+            task = serializer.save(
+                workspace=workspace,
+                client=client_profile,
+                domain_hosting=domain_hosting
+            )
             return Response(TaskSerializer(task).data, status=status.HTTP_201_CREATED)
-        
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
     
 class AssignSpocView(APIView):
     permission_classes = [AllowAny]

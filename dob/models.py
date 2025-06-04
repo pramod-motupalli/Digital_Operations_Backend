@@ -212,6 +212,8 @@ class Workspace(models.Model):
 from django.conf import settings
 
 class Task(models.Model):
+    # title = models.CharField(max_length=100)
+    current_step_index = models.IntegerField(default=0)
     workspace = models.ForeignKey(
         'Workspace',
         on_delete=models.CASCADE,

@@ -1,6 +1,5 @@
 from django.contrib import admin
-from .models import CustomUser, ClientProfile,TeamLeadProfile,ManagerProfile,StaffProfile,AccountantProfile
-from .models import Plan, DomainHosting, PlanRequest, Workspace,Task
+from .models import *
 
 admin.site.register(Plan)
 admin.site.register(DomainHosting)
