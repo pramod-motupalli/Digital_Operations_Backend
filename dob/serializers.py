@@ -518,3 +518,30 @@ class TaskDetailSerializer(serializers.ModelSerializer):
             full_name = f"{user.first_name} {user.last_name}".strip()
             return full_name if full_name else user.username
         return "N/A"
+    
+
+
+from rest_framework import serializers
+from .models import WorkItem, WorkflowStep
+
+class WorkflowStepSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source='user.username', read_only=True)
+
+    class Meta:
+        model = WorkflowStep
+        fields = ['id', 'role', 'user_name', 'order', 'status', 'review_status', 'completed_at']
+
+class WorkItemSerializer(serializers.ModelSerializer):
+    client_name = serializers.CharField(source='client.user.username', read_only=True)
+    domain = serializers.CharField(source='domain_hosting.domain_name', read_only=True)
+    steps = WorkflowStepSerializer(many=True, source='workflow_steps', read_only=True)
+
+    class Meta:
+        model = WorkItem
+        fields = [
+            'id', 'title', 'client_name', 'domain', 'created_at', 'steps',
+            'working_hours_design', 'working_hours_content', 'working_hours_dev'  # ✅ include these
+        ]
+
+
+

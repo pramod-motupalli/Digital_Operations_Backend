@@ -903,3 +903,41 @@ class SPOCTaskListView(APIView):
 
         serializer = TaskDetailSerializer(tasks, many=True)
         return Response(serializer.data)
+    
+
+# views.py
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from .models import WorkItem
+from .serializers import WorkItemSerializer
+
+class WorkItemListView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        work_items = WorkItem.objects.all().order_by('-created_at')
+        serializer = WorkItemSerializer(work_items, many=True)
+        return Response(serializer.data)
+
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+
+class WorkItemUpdateView(APIView):
+    permission_classes = [AllowAny]
+
+    def patch(self, request, pk):
+        try:
+            work_item = WorkItem.objects.get(pk=pk)
+        except WorkItem.DoesNotExist:
+            return Response({'error': 'Work item not found'}, status=404)
+
+        data = request.data
+        work_item.working_hours_design = data.get('working_hours_design', work_item.working_hours_design)
+        work_item.working_hours_content = data.get('working_hours_content', work_item.working_hours_content)
+        work_item.working_hours_dev = data.get('working_hours_dev', work_item.working_hours_dev)
+        work_item.save()
+
+        return Response({'message': 'Working hours updated successfully'})

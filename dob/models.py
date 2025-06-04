@@ -253,6 +253,9 @@ class WorkItem(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     client = models.ForeignKey('ClientProfile', on_delete=models.CASCADE, related_name='work_items')
     domain_hosting = models.ForeignKey('DomainHosting', on_delete=models.CASCADE, related_name='work_items')
+    working_hours_design = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    working_hours_content = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    working_hours_dev = models.DecimalField(max_digits=5, decimal_places=2, default=0)
 
 class WorkflowStep(models.Model):
     STATUS_CHOICES = [
