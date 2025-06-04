@@ -332,14 +332,20 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class TeamLeadSerializer(serializers.ModelSerializer):
-    name =  serializers.SerializerMethodField()
+    name = serializers.SerializerMethodField()
     email = serializers.EmailField(source='user.email')
+    username = serializers.SerializerMethodField()
 
     class Meta:
         model = TeamLeadProfile
-        fields = ['name', 'email', 'designation', 'is_spoc']
+        fields = ['name', 'email', 'username', 'designation', 'is_spoc']
+
     def get_name(self, obj):
         return f"{obj.user.first_name} {obj.user.last_name}".strip()
+
+    def get_username(self, obj):
+        return obj.user.username
+
 
 class StaffSerializer(serializers.ModelSerializer):
     email = serializers.SerializerMethodField()
@@ -477,3 +483,38 @@ class TaskSerializer(serializers.ModelSerializer):
         model = Task
         fields = ['id', 'workspace', 'workspace_id', 'workspace_name', 'title', 'description', 'status', 'created_at']
         read_only_fields = ['workspace', 'workspace_id', 'workspace_name', 'status', 'created_at']
+
+# your_app/serializers.py
+
+
+from rest_framework import serializers
+from .models import Task
+
+class TaskDetailSerializer(serializers.ModelSerializer):
+    workspace_name = serializers.SerializerMethodField()
+    domain_name = serializers.SerializerMethodField()
+    client_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Task
+        fields = [
+            'id', 'title', 'description', 'status', 'due_date', 'created_at',
+            'workspace', 'workspace_name',
+            'domain_hosting', 'domain_name',
+            'client_name'
+        ]
+
+    def get_workspace_name(self, obj):
+        return getattr(obj.workspace, 'name', None)
+
+    def get_domain_name(self, obj):
+        return getattr(obj.domain_hosting, 'domain_name', None)
+
+    def get_client_name(self, obj):
+        client_profile = obj.client
+        if client_profile and hasattr(client_profile, 'user'):
+            user = client_profile.user
+            # Return full name if available, otherwise username
+            full_name = f"{user.first_name} {user.last_name}".strip()
+            return full_name if full_name else user.username
+        return "N/A"

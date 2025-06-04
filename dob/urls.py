@@ -57,4 +57,6 @@ urlpatterns = [
     path('workspaces/spoc/', spoc_workspaces_view, name='spoc-workspaces'),
     path('workspaces/hd/', hd_maintenance_workspaces_view, name='hd-workspaces'),
     path('workspaces/staff/', staff_workspaces_view, name='staff-workspaces'),
+
+    path('spoc/tasks/', SPOCTaskListView.as_view(), name='spoc-task-list'),
 ]
