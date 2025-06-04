@@ -905,12 +905,6 @@ class SPOCTaskListView(APIView):
         return Response(serializer.data)
     
 
-# views.py
-
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from .models import WorkItem
-from .serializers import WorkItemSerializer
 
 class WorkItemListView(APIView):
     permission_classes = [AllowAny]
@@ -921,9 +915,6 @@ class WorkItemListView(APIView):
         return Response(serializer.data)
 
 
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
 
 class WorkItemUpdateView(APIView):
     permission_classes = [AllowAny]
@@ -938,6 +929,11 @@ class WorkItemUpdateView(APIView):
         work_item.working_hours_design = data.get('working_hours_design', work_item.working_hours_design)
         work_item.working_hours_content = data.get('working_hours_content', work_item.working_hours_content)
         work_item.working_hours_dev = data.get('working_hours_dev', work_item.working_hours_dev)
-        work_item.save()
 
-        return Response({'message': 'Working hours updated successfully'})
+        work_item.price_design = data.get('price_design', work_item.price_design)
+        work_item.price_content = data.get('price_content', work_item.price_content)
+        work_item.price_dev = data.get('price_dev', work_item.price_dev)
+
+        work_item.save()
+        return Response({'message': 'Working hours and prices updated successfully'})
+

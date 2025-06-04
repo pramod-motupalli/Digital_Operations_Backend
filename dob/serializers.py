@@ -540,7 +540,8 @@ class WorkItemSerializer(serializers.ModelSerializer):
         model = WorkItem
         fields = [
             'id', 'title', 'client_name', 'domain', 'created_at', 'steps',
-            'working_hours_design', 'working_hours_content', 'working_hours_dev'  # ✅ include these
+            'working_hours_design', 'working_hours_content', 'working_hours_dev',
+            'price_design', 'price_content', 'price_dev',  # NEW
         ]
 
 

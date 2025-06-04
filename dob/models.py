@@ -256,6 +256,9 @@ class WorkItem(models.Model):
     working_hours_design = models.DecimalField(max_digits=5, decimal_places=2, default=0)
     working_hours_content = models.DecimalField(max_digits=5, decimal_places=2, default=0)
     working_hours_dev = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    price_design = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    price_content = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    price_dev = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
 class WorkflowStep(models.Model):
     STATUS_CHOICES = [
