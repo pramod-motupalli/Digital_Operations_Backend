@@ -350,10 +350,10 @@ class TeamLeadSerializer(serializers.ModelSerializer):
 class StaffSerializer(serializers.ModelSerializer):
     email = serializers.SerializerMethodField()
     name = serializers.SerializerMethodField()
-
+    id = serializers.ReadOnlyField(source='user.id')
     class Meta:
         model = StaffProfile
-        fields = ['team_lead','designation', 'email', 'name']
+        fields = ['id','team_lead','designation', 'email', 'name']
 
     def get_email(self, obj):
         return obj.user.email
@@ -481,26 +481,33 @@ class TaskSerializer(serializers.ModelSerializer):
     client_name = serializers.SerializerMethodField()
     domain_name = serializers.SerializerMethodField()
 
+    # ✅ Add this
+    assigned_to = serializers.PrimaryKeyRelatedField(
+        queryset=StaffProfile.objects.all(), required=False, allow_null=True
+    )
+
     class Meta:
         model = Task
         fields = [
             'id', 'workspace', 'workspace_id', 'workspace_name',
             'title', 'description', 'status', 'created_at',
-            'client_name', 'domain_name'
+            'client_name', 'domain_name', 'assigned_to'
         ]
-        read_only_fields = fields
+        read_only_fields = [
+            'id', 'workspace', 'workspace_id', 'workspace_name',
+            'created_at', 'client_name', 'domain_name'
+        ]
 
     def get_client_name(self, obj):
-        # Return ClientProfile's related user's username
         if obj.client and obj.client.user:
             return obj.client.user.username
         return None
 
     def get_domain_name(self, obj):
-        # Return DomainHosting's domain_name
         if obj.domain_hosting:
             return obj.domain_hosting.domain_name
         return None
+
 
 
 

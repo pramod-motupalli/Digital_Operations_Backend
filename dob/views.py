@@ -807,7 +807,41 @@ class WorkspaceTaskListCreateView(APIView):
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+class AssignStaffToTaskView(APIView):
+    def patch(self, request, task_id):
+        task = get_object_or_404(Task, id=task_id)
+        customuser_id = request.data.get('assigned_to')
 
+        if not customuser_id:
+            return Response({'error': 'Staff (CustomUser) ID not provided.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Get StaffProfile with user_id = customuser_id
+        staff_profile = get_object_or_404(StaffProfile, user_id=customuser_id)
+        
+        task.assigned_to = staff_profile
+        task.save()
+
+        return Response({'message': 'Staff assigned successfully.'}, status=status.HTTP_200_OK)
+
+class AssignStatusView(APIView):
+    def post(self, request, task_id):
+        task = get_object_or_404(Task, id=task_id)
+        new_status = request.data.get('status')
+
+        allowed_statuses = ['pending', 'in_scope', 'out_of_scope']
+        if new_status not in allowed_statuses:
+            return Response(
+                {'error': f"Invalid status. Allowed values are: {', '.join(allowed_statuses)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        task.status = new_status
+        task.save()
+
+        return Response(
+            {'message': 'Status updated successfully.', 'task_id': task.id, 'new_status': task.status},
+            status=status.HTTP_200_OK
+        )
     
 class AssignSpocView(APIView):
     permission_classes = [AllowAny]

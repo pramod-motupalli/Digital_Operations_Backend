@@ -59,4 +59,6 @@ urlpatterns = [
     path('workspaces/staff/', staff_workspaces_view, name='staff-workspaces'),
 
     path('spoc/tasks/', SPOCTaskListView.as_view(), name='spoc-task-list'),
+    path('tasks/<int:task_id>/assign-staff/', AssignStaffToTaskView.as_view(), name='assign-staff-task'),
+    path('spoc/tasks/<int:task_id>/update-status/', AssignStatusView.as_view(), name='assign-status-task'),
 ]
