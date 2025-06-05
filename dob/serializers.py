@@ -521,10 +521,17 @@ from .models import Task
 class TaskDetailSerializer(serializers.ModelSerializer):
     workspace_id = serializers.ReadOnlyField(source='workspace.id')
     workspace_name = serializers.ReadOnlyField(source='workspace.workspace_name')
+    assigned_to_username = serializers.SerializerMethodField()
+    client_name = serializers.SerializerMethodField()
+    domain_name = serializers.SerializerMethodField()
+    raised_to_client = serializers.BooleanField()
+    client_acceptance_status = serializers.CharField()
+    payment_status = serializers.CharField()
+    raised_to_spoc = serializers.BooleanField()
 
     class Meta:
         model = Task
-        fields = ['id', 'workspace', 'workspace_id', 'workspace_name', 'title', 'description', 'status', 'created_at']
+        fields = ['id', 'workspace', 'workspace_id', 'workspace_name', 'title', 'description', 'status', 'created_at', 'assigned_to_username', 'client_name', 'domain_name', 'raised_to_client', 'client_acceptance_status', 'payment_status', 'rejection_reason', 'raised_to_spoc', 'due_date', 'deadline']
         read_only_fields = ['workspace', 'workspace_id', 'workspace_name', 'status', 'created_at']
 
     def get_workspace_name(self, obj):
@@ -541,3 +548,12 @@ class TaskDetailSerializer(serializers.ModelSerializer):
             full_name = f"{user.first_name} {user.last_name}".strip()
             return full_name if full_name else user.username
         return "N/A"
+    
+    def get_assigned_to_username(self, obj):
+        return getattr(obj.assigned_to.user, 'username', 'N/A') if obj.assigned_to else 'Unassigned'
+    
+
+
+
+
+

@@ -61,4 +61,11 @@ urlpatterns = [
     path('spoc/tasks/', SPOCTaskListView.as_view(), name='spoc-task-list'),
     path('tasks/<int:task_id>/assign-staff/', AssignStaffToTaskView.as_view(), name='assign-staff-task'),
     path('spoc/tasks/<int:task_id>/update-status/', AssignStatusView.as_view(), name='assign-status-task'),
+    path('tasks/out-of-scope/', OutOfScopeTasksView.as_view(), name='out_of_scope_tasks'),
+    path('tasks/raise-request/<int:pk>/', RaiseTaskRequestView.as_view()),
+    path('tasks/<int:pk>/accept/', AcceptTaskView.as_view(), name='accept-task'),
+    path('tasks/<int:pk>/reject/', RejectTaskView.as_view()),
+    path('tasks/<int:pk>/payment-done/', MarkPaymentDoneView.as_view()),
+    path('tasks/<int:pk>/raise-to-spoc/', RaiseToSPOCView.as_view(), name='raise-to-spoc'),
+    path('tasks/raised-to-spoc/', RaisedToSPOCTasksView.as_view(), name='raised-to-spoc-tasks'),
 ]
