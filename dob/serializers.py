@@ -493,10 +493,17 @@ from .models import Task
 class TaskDetailSerializer(serializers.ModelSerializer):
     workspace_id = serializers.ReadOnlyField(source='workspace.id')
     workspace_name = serializers.ReadOnlyField(source='workspace.workspace_name')
+    assigned_to_username = serializers.SerializerMethodField()
+    client_name = serializers.SerializerMethodField()
+    domain_name = serializers.SerializerMethodField()
+    raised_to_client = serializers.BooleanField()
+    client_acceptance_status = serializers.CharField()
+    payment_status = serializers.CharField()
+    raised_to_spoc = serializers.BooleanField()
 
     class Meta:
         model = Task
-        fields = ['id', 'workspace', 'workspace_id', 'workspace_name', 'title', 'description', 'status', 'created_at']
+        fields = ['id', 'workspace', 'workspace_id', 'workspace_name', 'title', 'description', 'status', 'created_at', 'assigned_to_username', 'client_name', 'domain_name', 'raised_to_client', 'client_acceptance_status', 'payment_status', 'rejection_reason', 'raised_to_spoc']
         read_only_fields = ['workspace', 'workspace_id', 'workspace_name', 'status', 'created_at']
 
     def get_workspace_name(self, obj):
@@ -514,30 +521,11 @@ class TaskDetailSerializer(serializers.ModelSerializer):
             return full_name if full_name else user.username
         return "N/A"
     
+    def get_assigned_to_username(self, obj):
+        return getattr(obj.assigned_to.user, 'username', 'N/A') if obj.assigned_to else 'Unassigned'
+    
 
 
-from rest_framework import serializers
-from .models import WorkItem, WorkflowStep
-
-class WorkflowStepSerializer(serializers.ModelSerializer):
-    user_name = serializers.CharField(source='user.username', read_only=True)
-
-    class Meta:
-        model = WorkflowStep
-        fields = ['id', 'role', 'user_name', 'order', 'status', 'review_status', 'completed_at']
-
-class WorkItemSerializer(serializers.ModelSerializer):
-    client_name = serializers.CharField(source='client.user.username', read_only=True)
-    domain = serializers.CharField(source='domain_hosting.domain_name', read_only=True)
-    steps = WorkflowStepSerializer(many=True, source='workflow_steps', read_only=True)
-
-    class Meta:
-        model = WorkItem
-        fields = [
-            'id', 'title', 'client_name', 'domain', 'created_at', 'steps',
-            'working_hours_design', 'working_hours_content', 'working_hours_dev',
-            'price_design', 'price_content', 'price_dev',  # NEW
-        ]
 
 
 

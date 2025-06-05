@@ -905,34 +905,84 @@ class SPOCTaskListView(APIView):
     
 
 
-class WorkItemListView(APIView):
+class OutOfScopeTasksView(APIView):
+    permission_classes = [AllowAny]
+    def get(self, request):
+        tasks = Task.objects.filter(status='out_of_scope')
+        serializer = TaskDetailSerializer(tasks, many=True)
+        return Response(serializer.data)
+
+class RaiseTaskRequestView(APIView):
+    permission_classes = [AllowAny]
+    def post(self, request, pk):
+        try:
+            task = Task.objects.get(pk=pk)
+            task.raised_to_client = True
+            task.save()
+            return Response({'message': 'Request raised successfully.'}, status=status.HTTP_200_OK)
+        except Task.DoesNotExist:
+            return Response({'error': 'Task not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+class AcceptTaskView(APIView):
+    permission_classes=[AllowAny]
+    def post(self, request, pk):
+        try:
+            task = Task.objects.get(pk=pk)
+            task.client_acceptance_status = 'accepted'
+            task.rejection_reason = ''
+            task.save()
+            return Response({'message': 'Task marked as accepted.'})
+        except Task.DoesNotExist:
+            return Response({'error': 'Task not found.'}, status=404)
+
+
+class RejectTaskView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, pk):
+        reason = request.data.get('reason', '')
+        try:
+            task = Task.objects.get(pk=pk)
+            task.client_acceptance_status = 'rejected'
+            task.rejection_reason = reason
+            task.payment_status = 'unavailable'  # <-- set as unavailable on rejection
+            task.save()
+            return Response({'message': 'Task marked as rejected.'})
+        except Task.DoesNotExist:
+            return Response({'error': 'Task not found.'}, status=404)
+
+
+
+class MarkPaymentDoneView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, pk):
+        try:
+            task = Task.objects.get(pk=pk)
+            if task.client_acceptance_status == 'accepted':
+                task.payment_status = 'done'
+                task.save()
+                return Response({'message': 'Payment marked as done.'})
+            return Response({'error': 'Task not accepted yet.'}, status=400)
+        except Task.DoesNotExist:
+            return Response({'error': 'Task not found.'}, status=404)
+
+
+class RaiseToSPOCView(APIView):
+    permission_classes = [AllowAny]
+    def post(self, request, pk):
+        try:
+            task = Task.objects.get(pk=pk)
+            task.raised_to_spoc = True
+            task.save()
+            return Response({"message": "Task raised to SPOC"}, status=status.HTTP_200_OK)
+        except Task.DoesNotExist:
+            return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
+
+class RaisedToSPOCTasksView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        work_items = WorkItem.objects.all().order_by('-created_at')
-        serializer = WorkItemSerializer(work_items, many=True)
+        tasks = Task.objects.filter(raised_to_spoc=True)
+        serializer = TaskDetailSerializer(tasks, many=True)
         return Response(serializer.data)
-
-
-
-class WorkItemUpdateView(APIView):
-    permission_classes = [AllowAny]
-
-    def patch(self, request, pk):
-        try:
-            work_item = WorkItem.objects.get(pk=pk)
-        except WorkItem.DoesNotExist:
-            return Response({'error': 'Work item not found'}, status=404)
-
-        data = request.data
-        work_item.working_hours_design = data.get('working_hours_design', work_item.working_hours_design)
-        work_item.working_hours_content = data.get('working_hours_content', work_item.working_hours_content)
-        work_item.working_hours_dev = data.get('working_hours_dev', work_item.working_hours_dev)
-
-        work_item.price_design = data.get('price_design', work_item.price_design)
-        work_item.price_content = data.get('price_content', work_item.price_content)
-        work_item.price_dev = data.get('price_dev', work_item.price_dev)
-
-        work_item.save()
-        return Response({'message': 'Working hours and prices updated successfully'})
-

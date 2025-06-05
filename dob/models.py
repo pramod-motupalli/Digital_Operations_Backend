@@ -265,6 +265,29 @@ class Task(models.Model):
 
     due_date = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    raised_to_client = models.BooleanField(default=False)
+    ACCEPTANCE_CHOICES = [
+        ('pending', 'Pending'),
+        ('accepted', 'Accepted'),
+        ('rejected', 'Rejected'),
+    ]
+    client_acceptance_status = models.CharField(
+        max_length=10,
+        choices=ACCEPTANCE_CHOICES,
+        default='pending',
+    )
+    rejection_reason = models.TextField(blank=True, null=True)
+    PAYMENT_STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('done', 'Done'),
+        ('unavailable', 'Unavailable'),
+    ]
+    payment_status = models.CharField(
+        max_length=20,
+        choices=PAYMENT_STATUS_CHOICES,
+        default='pending',
+    )
+    raised_to_spoc = models.BooleanField(default=False)
 
     def __str__(self):
         return self.title
