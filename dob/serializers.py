@@ -502,15 +502,6 @@ class TaskSerializer(serializers.ModelSerializer):
             return obj.domain_hosting.domain_name
         return None
 
-
-
-
-# your_app/serializers.py
-
-
-from rest_framework import serializers
-from .models import Task
-
 class TaskDetailSerializer(serializers.ModelSerializer):
     workspace_id = serializers.ReadOnlyField(source='workspace.id')
     workspace_name = serializers.ReadOnlyField(source='workspace.workspace_name')
@@ -524,7 +515,7 @@ class TaskDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Task
-        fields = ['id', 'workspace', 'workspace_id', 'workspace_name', 'title', 'description', 'status', 'created_at', 'assigned_to_username', 'client_name', 'domain_name', 'raised_to_client', 'client_acceptance_status', 'payment_status', 'rejection_reason', 'raised_to_spoc']
+        fields = ['id', 'workspace', 'workspace_id', 'workspace_name', 'title', 'description', 'status', 'created_at', 'assigned_to_username', 'client_name', 'domain_name', 'raised_to_client', 'client_acceptance_status', 'payment_status', 'rejection_reason', 'raised_to_spoc', 'due_date']
         read_only_fields = ['workspace', 'workspace_id', 'workspace_name', 'status', 'created_at']
 
     def get_workspace_name(self, obj):
