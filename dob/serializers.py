@@ -515,7 +515,7 @@ class TaskDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Task
-        fields = ['id', 'workspace', 'workspace_id', 'workspace_name', 'title', 'description', 'status', 'created_at', 'assigned_to_username', 'client_name', 'domain_name', 'raised_to_client', 'client_acceptance_status', 'payment_status', 'rejection_reason', 'raised_to_spoc', 'due_date']
+        fields = ['id', 'workspace', 'workspace_id', 'workspace_name', 'title', 'description', 'status', 'created_at', 'assigned_to_username', 'client_name', 'domain_name', 'raised_to_client', 'client_acceptance_status', 'payment_status', 'rejection_reason', 'raised_to_spoc', 'due_date', 'deadline']
         read_only_fields = ['workspace', 'workspace_id', 'workspace_name', 'status', 'created_at']
 
     def get_workspace_name(self, obj):

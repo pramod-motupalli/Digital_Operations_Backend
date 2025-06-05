@@ -6,6 +6,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework_simplejwt.tokens import RefreshToken
+from datetime import datetime
 from django.core.mail import send_mail
 from django.contrib.auth import get_user_model
 from django.urls import reverse
@@ -983,17 +984,30 @@ class MarkPaymentDoneView(APIView):
         except Task.DoesNotExist:
             return Response({'error': 'Task not found.'}, status=404)
 
-
 class RaiseToSPOCView(APIView):
     permission_classes = [AllowAny]
+
     def post(self, request, pk):
         try:
             task = Task.objects.get(pk=pk)
-            task.raised_to_spoc = True
-            task.save()
-            return Response({"message": "Task raised to SPOC"}, status=status.HTTP_200_OK)
         except Task.DoesNotExist:
             return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        deadline = request.data.get("deadline")
+        if not deadline:
+            return Response({"error": "Deadline is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            deadline_date = datetime.strptime(deadline, "%Y-%m-%d").date()
+        except ValueError:
+            return Response({"error": "Invalid date format. Use YYYY-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
+
+        task.raised_to_spoc = True
+        task.deadline = deadline_date
+        task.save()
+
+        return Response({"message": "Task raised to SPOC with deadline."}, status=status.HTTP_200_OK)
+
 
 class RaisedToSPOCTasksView(APIView):
     permission_classes = [AllowAny]

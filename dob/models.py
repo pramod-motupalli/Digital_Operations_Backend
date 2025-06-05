@@ -290,6 +290,7 @@ class Task(models.Model):
         default='pending',
     )
     raised_to_spoc = models.BooleanField(default=False)
+    deadline = models.DateField(null=True, blank=True)
 
     def __str__(self):
         return self.title
