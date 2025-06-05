@@ -68,4 +68,5 @@ urlpatterns = [
     path('tasks/<int:pk>/payment-done/', MarkPaymentDoneView.as_view()),
     path('tasks/<int:pk>/raise-to-spoc/', RaiseToSPOCView.as_view(), name='raise-to-spoc'),
     path('tasks/raised-to-spoc/', RaisedToSPOCTasksView.as_view(), name='raised-to-spoc-tasks'),
+    path('clients/tasks/', ClientOutOfScopeTasksView.as_view(), name='client-workspace-tasks'),
 ]

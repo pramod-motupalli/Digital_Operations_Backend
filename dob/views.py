@@ -151,10 +151,10 @@ class StaffAutoRegisterView(APIView):
     def post(self, request):
         data = request.data.copy()
 
-        name = data.get('username')
+        name = data.get('name') or data.get('username')
         email = data.get('email')
         designation = data.get('designation')
-        team_lead_username = data.get('team_lead_id') or data.get('teamLead')
+        team_lead_username = data.get('team_lead_id') or data.get('teamLead') or data.get('team_lead')
         print(name,email,designation,team_lead_username)
         if not all([name, email, designation, team_lead_username]):
             return Response({'error': 'Missing required fields.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -1048,5 +1048,14 @@ class RaisedToSPOCTasksView(APIView):
 
     def get(self, request):
         tasks = Task.objects.filter(raised_to_spoc=True)
+        serializer = TaskDetailSerializer(tasks, many=True)
+        return Response(serializer.data)
+
+class ClientOutOfScopeTasksView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        client = request.user.client_profile
+        tasks = Task.objects.filter(client=client).select_related('workspace')
         serializer = TaskDetailSerializer(tasks, many=True)
         return Response(serializer.data)
