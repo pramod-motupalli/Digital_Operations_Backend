@@ -475,14 +475,35 @@ class WorkspaceSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class TaskSerializer(serializers.ModelSerializer):
-    # Read-only fields set by the backend/db
     workspace_id = serializers.ReadOnlyField(source='workspace.id')
     workspace_name = serializers.ReadOnlyField(source='workspace.workspace_name')
 
+    client_name = serializers.SerializerMethodField()
+    domain_name = serializers.SerializerMethodField()
+
     class Meta:
         model = Task
-        fields = ['id', 'workspace', 'workspace_id', 'workspace_name', 'title', 'description', 'status', 'created_at']
-        read_only_fields = ['workspace', 'workspace_id', 'workspace_name', 'status', 'created_at']
+        fields = [
+            'id', 'workspace', 'workspace_id', 'workspace_name',
+            'title', 'description', 'status', 'created_at',
+            'client_name', 'domain_name'
+        ]
+        read_only_fields = fields
+
+    def get_client_name(self, obj):
+        # Return ClientProfile's related user's username
+        if obj.client and obj.client.user:
+            return obj.client.user.username
+        return None
+
+    def get_domain_name(self, obj):
+        # Return DomainHosting's domain_name
+        if obj.domain_hosting:
+            return obj.domain_hosting.domain_name
+        return None
+
+
+
 
 # your_app/serializers.py
 
