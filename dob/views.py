@@ -1177,7 +1177,6 @@ class RaisedToSPOCTasksView(APIView):
         tasks = Task.objects.filter(raised_to_spoc=True)
         serializer = TaskDetailSerializer(tasks, many=True)
         return Response(serializer.data)
-<<<<<<< HEAD
     
 
 #notifications
@@ -1237,7 +1236,6 @@ def get_my_notifications(request):
         })
 
     return Response({'notifications': data})
-=======
 
 class ClientOutOfScopeTasksView(APIView):
     permission_classes = [IsAuthenticated]
@@ -1247,4 +1245,3 @@ class ClientOutOfScopeTasksView(APIView):
         tasks = Task.objects.filter(client=client).select_related('workspace')
         serializer = TaskDetailSerializer(tasks, many=True)
         return Response(serializer.data)
->>>>>>> f39251a42b84beeb29b2d68261a30ccd618b511b
