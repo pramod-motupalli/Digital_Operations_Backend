@@ -68,10 +68,14 @@ urlpatterns = [
     path('tasks/<int:pk>/payment-done/', MarkPaymentDoneView.as_view()),
     path('tasks/<int:pk>/raise-to-spoc/', RaiseToSPOCView.as_view(), name='raise-to-spoc'),
     path('tasks/raised-to-spoc/', RaisedToSPOCTasksView.as_view(), name='raised-to-spoc-tasks'),
+<<<<<<< HEAD
     path('tasks/<int:task_id>/assign-staff/', AssignMultipleStaffToTaskView.as_view(), name='assign-staff-to-task'),
 
     path('staff/tasks/cards/', get_spoc_tasks, name='staff-task-cards'),
     path('staff/tasks/cards/<int:pk>/', TaskStatusUpdateView.as_view(), name='task-status-update'),
     path('notifications/my/', get_my_notifications, name='my-notifications'),
 
+=======
+    path('clients/tasks/', ClientOutOfScopeTasksView.as_view(), name='client-workspace-tasks'),
+>>>>>>> f39251a42b84beeb29b2d68261a30ccd618b511b
 ]
