@@ -3,11 +3,7 @@ from django.contrib.auth import authenticate, get_user_model
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 
-from .models import (
-    CustomUser, ClientProfile, TeamLeadProfile, StaffProfile,
-    AccountantProfile, ManagerProfile, Plan, DomainHosting,
-    PlanRequest, PaymentRequest, Workspace,Task
-)
+from .models import *
 
 CustomUser = get_user_model()
 
@@ -474,40 +470,59 @@ class WorkspaceSerializer(serializers.ModelSerializer):
         model = Workspace
         fields = '__all__'
 
+class TaskAssignmentSerializer(serializers.ModelSerializer):
+    staff_member_id = serializers.PrimaryKeyRelatedField(
+        queryset=StaffProfile.objects.all(),
+        source='staff_member',
+    )
+    staff_member_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TaskAssignment
+        fields = [
+            'id',
+            'staff_member_id',
+            'staff_member_name',
+            'designation_at_assignment',
+            'time_estimation',
+            'member_deadline',
+        ]
+
+    def get_staff_member_name(self, obj):
+        return obj.staff_member.user.username if obj.staff_member and obj.staff_member.user else None
+
 class TaskSerializer(serializers.ModelSerializer):
     workspace_id = serializers.ReadOnlyField(source='workspace.id')
     workspace_name = serializers.ReadOnlyField(source='workspace.workspace_name')
-
     client_name = serializers.SerializerMethodField()
     domain_name = serializers.SerializerMethodField()
 
-    # ✅ Add this
-    assigned_to = serializers.PrimaryKeyRelatedField(
-        queryset=StaffProfile.objects.all(), required=False, allow_null=True
-    )
-
+    # Nested assignments
+    assignments = TaskAssignmentSerializer(source='taskassignment_set', many=True, required=False)
+    # assigned_to_usernames = serializers.SerializerMethodField()
     class Meta:
         model = Task
         fields = [
             'id', 'workspace', 'workspace_id', 'workspace_name',
             'title', 'description', 'status', 'created_at',
-            'client_name', 'domain_name', 'assigned_to'
+            'client_name', 'domain_name',
+            'assignments',  # ✅ nested list of assigned staff with metadata
+            'flow_or_hours', 'workhours',
+            'due_date', 'raised_to_client', 'client_acceptance_status',
+            'rejection_reason', 'payment_status', 'raised_to_spoc', 'deadline','task_status'
         ]
         read_only_fields = [
-            'id', 'workspace', 'workspace_id', 'workspace_name',
+            'id', 'workspace_id', 'workspace_name',
             'created_at', 'client_name', 'domain_name'
         ]
 
     def get_client_name(self, obj):
-        if obj.client and obj.client.user:
-            return obj.client.user.username
-        return None
+        return obj.client.user.username if obj.client and obj.client.user else None
 
     def get_domain_name(self, obj):
-        if obj.domain_hosting:
-            return obj.domain_hosting.domain_name
-        return None
-
+        return obj.domain_hosting.domain_name if obj.domain_hosting else None
+    def get_assigned_to_usernames(self, obj):
+        return [staff.user.username for staff in obj.assigned_staff.all()]
 
 
 
@@ -550,10 +565,94 @@ class TaskDetailSerializer(serializers.ModelSerializer):
         return "N/A"
     
     def get_assigned_to_username(self, obj):
-        return getattr(obj.assigned_to.user, 'username', 'N/A') if obj.assigned_to else 'Unassigned'
-    
+        return [staff.user.username for staff in obj.assigned_staff.all()]
 
 
+from rest_framework import serializers
+from datetime import datetime
+from django.utils.timezone import localtime
+from .models import Task
+
+from rest_framework import serializers
+from django.utils.timezone import localtime
+from datetime import datetime
+from .models import Task, TaskAssignment
 
 
+class TaskCardSerializer(serializers.ModelSerializer):
+    workspaceName = serializers.CharField(source='workspace.name')
+    column = serializers.SerializerMethodField()
+    escalation = serializers.SerializerMethodField()
+    assignees = serializers.SerializerMethodField()
+    dateInfo = serializers.SerializerMethodField()
+    timeInfo = serializers.SerializerMethodField()
+    daysLeft = serializers.SerializerMethodField()
+    comments = serializers.SerializerMethodField()
+    files = serializers.SerializerMethodField()
+    tags = serializers.SerializerMethodField()
+    image = serializers.SerializerMethodField()
 
+    class Meta:
+        model = Task
+        fields = [
+            'id', 'column', 'workspaceName', 'priority', 'escalation', 'title',
+            'description', 'image', 'assignees', 'dateInfo', 'timeInfo',
+            'daysLeft', 'comments', 'files', 'tags'
+        ]
+
+    def get_column(self, obj):
+        return obj.task_status.capitalize() if obj.task_status else "TO-DO"
+
+    def get_escalation(self, obj):
+        return obj.priority == 'High'
+
+    def get_assignees(self, obj):
+        """
+        Return assigned staff members as avatar colors or initials.
+        For now, simulate colors — but you can use obj.assigned_staff.all() or through model.
+        """
+        # Example using avatar colors (can be changed to names/photos)
+        staff_qs = obj.assigned_staff.all()
+        avatar_colors = ["#FF5733", "#FFC300", "#DAF7A6", "#C70039"]
+        return avatar_colors[:staff_qs.count()]
+
+    def get_dateInfo(self, obj):
+        return obj.created_at.strftime("%d/%m/%y") if obj.created_at else ""
+
+    def get_timeInfo(self, obj):
+        return localtime(obj.created_at).strftime("%I:%M %p") if obj.created_at else ""
+
+    def get_daysLeft(self, obj):
+        if obj.deadline:
+            days = (obj.deadline - datetime.now().date()).days
+            return f"D-{days}" if days >= 0 else "Expired"
+        return "D-N/A"
+
+    def get_comments(self, obj):
+        # Replace with real related comment count logic if available
+        return obj.comments.count() if hasattr(obj, 'comments') else 0
+
+    def get_files(self, obj):
+        # Replace with real related files count if such a model exists
+        return obj.files.count() if hasattr(obj, 'files') else 0
+
+    def get_tags(self, obj):
+        # Implement tags logic if there's a Tag model related to Task
+        return [tag.name for tag in obj.tags.all()] if hasattr(obj, 'tags') else []
+
+    def get_image(self, obj):
+        # Optional: derive from related domain/client/workspace
+        return "TASK_IMAGE_URL"
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomUser
+        fields = ['id', 'username', 'email']
+
+class NotificationSerializer(serializers.ModelSerializer):
+    from_user = UserSerializer()
+    to_users = UserSerializer(many=True)
+
+    class Meta:
+        model = Notification
+        fields = ['id', 'from_user', 'to_users', 'subject', 'message', 'is_read', 'created_at']

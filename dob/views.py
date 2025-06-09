@@ -689,16 +689,47 @@ class PaymentRequestView(APIView):
 
 
 class WorkspaceCreateAPIView(APIView):
-    permission_classes = [AllowAny]
 
     # CREATE new workspace
+    from .models import Notification  # Assuming Notification is in the same app
+    # from users.models import StaffProfile, SPOCProfile  # Adjust import paths
+    from django.contrib.auth import get_user_model
+
+    permission_classes=[AllowAny]
     def post(self, request):
         serializer = WorkspaceSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
+            workspace = serializer.save()
+            User = get_user_model()
+            print(request.data)
+            try:
+                manager = ManagerProfile.objects.get()
+            except ManagerProfile.DoesNotExist:
+                return Response({'error': 'No manager found in the system.'}, status=404)
+            except ManagerProfile.MultipleObjectsReturned:
+                manager = ManagerProfile.objects.first()
+
+            # Get staff and SPOC related to this workspace only
+            assign_spoc_id = request.data.get('assign_spoc')
+            assign_staff_id = request.data.get('assign_staff')
+            hd_maintenance_id = request.data.get('hd_maintenance')
+
+            to_user_ids = [assign_spoc_id, assign_staff_id, hd_maintenance_id]
+            to_users = User.objects.filter(id__in=to_user_ids)
+
+            # to_users = staff_users.union(spoc_users)
+
+            notification = Notification.objects.create(
+                from_user=manager.user,
+                subject="Workspace Creation",
+                message=f"A new workspace '{workspace.workspace_name}' has been created."
+            )
+            notification.to_users.set(to_users)
+
             return Response({'message': 'Workspace created successfully!'}, status=status.HTTP_201_CREATED)
-        print(serializer.errors)
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
     # LIST all workspaces
     def get(self, request):
@@ -766,11 +797,6 @@ from .serializers import TaskSerializer
 class WorkspaceTaskListCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
-    """
-    List or create tasks for a specific workspace.
-    URL: /api/users/workspaces/<int:workspace_id>/tasks/
-    """
-
     def get(self, request, workspace_id):
         workspace = get_object_or_404(Workspace, id=workspace_id)
         tasks = Task.objects.filter(workspace=workspace).order_by('-created_at')
@@ -808,6 +834,23 @@ class WorkspaceTaskListCreateView(APIView):
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+class TaskStatusUpdateView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, pk):
+        task = get_object_or_404(Task, pk=pk)
+        new_status = request.data.get('task_status')
+        print("PATCH payload:", request.data)
+        # Optional: Validate if the status is one of the allowed choices
+        valid_statuses = [choice[0] for choice in Task._meta.get_field('task_status').choices]
+        if new_status not in valid_statuses:
+            return Response({"error": "Invalid task status."}, status=status.HTTP_400_BAD_REQUEST)
+
+        task.task_status = new_status
+        task.save()
+        serializer = TaskSerializer(task)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
 class AssignStaffToTaskView(APIView):
     def patch(self, request, task_id):
         task = get_object_or_404(Task, id=task_id)
@@ -823,6 +866,60 @@ class AssignStaffToTaskView(APIView):
         task.save()
 
         return Response({'message': 'Staff assigned successfully.'}, status=status.HTTP_200_OK)
+
+class AssignMultipleStaffToTaskView(APIView):
+    permission_classes=[IsAuthenticated]
+    
+    def post(self, request, task_id):
+        task = get_object_or_404(Task, id=task_id)
+        assignments_data = request.data.get('assignments', [])
+
+        if not isinstance(assignments_data, list) or not assignments_data:
+            return Response({'error': 'Provide a list of staff assignments.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        User = get_user_model()
+
+        assigned_user_ids = []  # To collect user ids for notifications
+
+        for entry in assignments_data:
+            staff_id = entry.get('staff_member_id')
+            if not staff_id:
+                continue
+
+            staff = get_object_or_404(StaffProfile, user_id=staff_id)
+
+            TaskAssignment.objects.update_or_create(
+                task=task,
+                staff_member=staff,
+                defaults={
+                    'designation_at_assignment': entry.get('designation_at_assignment', ''),
+                    'time_estimation': entry.get('time_estimation'),
+                    'member_deadline': entry.get('member_deadline'),
+                }
+            )
+            assigned_user_ids.append(staff.user.id)
+
+        # Create notifications for assigned staff members
+        try:
+            manager = ManagerProfile.objects.get()
+        except ManagerProfile.DoesNotExist:
+            # If no manager, skip notification creation
+            manager = None
+        except ManagerProfile.MultipleObjectsReturned:
+            manager = ManagerProfile.objects.first()
+
+        if manager and assigned_user_ids:
+            to_users = User.objects.filter(id__in=assigned_user_ids)
+
+            notification = Notification.objects.create(
+                from_user=request.user,
+                subject=f"Task Assignment Updated: {task.title}",
+                message=f"You have been assigned/updated for the task '{task.title}'."
+            )
+            notification.to_users.set(to_users)
+
+        return Response({'message': 'Staff assigned with metadata successfully.'}, status=status.HTTP_200_OK)
+
 
 class AssignStatusView(APIView):
     def post(self, request, task_id):
@@ -858,8 +955,49 @@ class AssignSpocView(APIView):
         except (CustomUser.DoesNotExist, TeamLeadProfile.DoesNotExist):
             return Response({"error": "Team Lead not found"}, status=status.HTTP_404_NOT_FOUND)
 
+from django.utils.timezone import now
+from datetime import datetime
 
-from dob.models import ClientProfile  # Make sure this import exists
+from django.http import JsonResponse
+from django.utils.timezone import now
+from datetime import datetime
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_spoc_tasks(request):
+    spoc_user = request.user
+    workspaces = Workspace.objects.filter(assign_spoc=spoc_user)
+
+    tasks_list = []
+
+    for ws in workspaces:
+        tasks = ws.tasks.all()  # related_name in Task is 'tasks'
+
+        for task in tasks:
+            # Format your JSON object here as per your needs
+            task_json = {
+                "id": task.id,
+                "column": task.task_status,  # or derive from task.status or workflow
+                "workspaceName": ws.workspace_name,
+                "priority": "High",  # derive if you have priority field
+                "escalation": False, # add escalation logic if any
+                "title": task.title,
+                "description": task.description,
+                "image": "TASK_IMAGE_URL",  # placeholder or field
+                "assignees": ["#FF5733", "#FFC300"],  # map staff colors or names
+                "dateInfo": task.created_at.strftime("%d/%m/%y"),
+                "timeInfo": task.created_at.strftime("%I:%M %p"),
+                "daysLeft": f"D-{(task.due_date - now().date()).days if task.deadline else 'N/A'}",
+                "comments": 12,  # fetch comment count if available
+                "files": 0,      # fetch attached files count if available
+                "tags": ["Development", "Content Writing"],  # your tags logic
+            }
+            tasks_list.append(task_json)
+
+    return JsonResponse(tasks_list, safe=False)
+
+
 
 class get_logged_in_client(APIView):
     permission_classes = [AllowAny]
@@ -884,17 +1022,6 @@ class get_logged_in_client(APIView):
                 pass  # or return a 404/empty profile
 
         return Response(response_data)
-
-# class WorkspaceTaskListCreateView(APIView):
-#     ...
-    
-
-# 🔽 PASTE STARTING HERE
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from .models import Workspace
-from .serializers import WorkspaceSerializer
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -1050,6 +1177,65 @@ class RaisedToSPOCTasksView(APIView):
         tasks = Task.objects.filter(raised_to_spoc=True)
         serializer = TaskDetailSerializer(tasks, many=True)
         return Response(serializer.data)
+    
+
+#notifications
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+from django.utils.text import Truncator
+from django.utils import timezone
+from django.contrib.auth import get_user_model
+
+from .models import Notification
+
+CustomUser = get_user_model()
+
+DEFAULT_AVATAR_URL = 'https://images.unsplash.com/photo-1531427186611-ecfd6d936c79?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_my_notifications(request):
+    user = request.user
+    notifications = Notification.objects.filter(
+        to_users=user
+    ).select_related('from_user').order_by('-created_at')
+
+    data = []
+    for notif in notifications:
+        sender = notif.from_user
+        sender_name = sender.get_full_name().strip() if sender.get_full_name() and sender.get_full_name().strip() else sender.username
+
+        avatar_url = DEFAULT_AVATAR_URL
+        # You can uncomment and adapt this if you use profile avatars:
+        # try:
+        #     if hasattr(sender, 'profile') and sender.profile.avatar and hasattr(sender.profile.avatar, 'url'):
+        #         avatar_url = request.build_absolute_uri(sender.profile.avatar.url)
+        # except Exception:
+        #     pass
+
+        message_preview = Truncator(notif.message).chars(120, html=False, truncate='...')
+        time_display = notif.created_at.strftime('%I:%M %p').replace('AM', 'A.M.').replace('PM', 'P.M.')
+        timestamp_detail_display = notif.created_at.strftime('%B %d, %Y, %I:%M:%S %p').replace('AM', 'A.M.').replace('PM', 'P.M.')
+
+        data.append({
+            'id': notif.pk,
+            'avatarUrl': avatar_url,
+            'name': sender_name,
+            'message': message_preview,
+            'time': time_display,
+            'subject': notif.subject,
+            'fullContent': notif.message,
+            'senderSignatureName': sender_name,
+            'ctaText': 'View Details',
+            'timestampDetail': timestamp_detail_display,
+            'is_read': notif.is_read,
+            'created_at_iso': notif.created_at.isoformat(),
+        })
+
+    return Response({'notifications': data})
 
 class ClientOutOfScopeTasksView(APIView):
     permission_classes = [IsAuthenticated]

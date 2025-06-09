@@ -59,7 +59,7 @@ urlpatterns = [
     path('workspaces/staff/', staff_workspaces_view, name='staff-workspaces'),
 
     path('spoc/tasks/', SPOCTaskListView.as_view(), name='spoc-task-list'),
-    path('tasks/<int:task_id>/assign-staff/', AssignStaffToTaskView.as_view(), name='assign-staff-task'),
+    # path('tasks/<int:task_id>/assign-staff/', AssignStaffToTaskView.as_view(), name='assign-staff-task'),
     path('spoc/tasks/<int:task_id>/update-status/', AssignStatusView.as_view(), name='assign-status-task'),
     path('tasks/out-of-scope/', OutOfScopeTasksView.as_view(), name='out_of_scope_tasks'),
     path('tasks/raise-request/<int:pk>/', RaiseTaskRequestView.as_view()),
@@ -68,5 +68,11 @@ urlpatterns = [
     path('tasks/<int:pk>/payment-done/', MarkPaymentDoneView.as_view()),
     path('tasks/<int:pk>/raise-to-spoc/', RaiseToSPOCView.as_view(), name='raise-to-spoc'),
     path('tasks/raised-to-spoc/', RaisedToSPOCTasksView.as_view(), name='raised-to-spoc-tasks'),
+    path('tasks/<int:task_id>/assign-staff/', AssignMultipleStaffToTaskView.as_view(), name='assign-staff-to-task'),
+
+    path('staff/tasks/cards/', get_spoc_tasks, name='staff-task-cards'),
+    path('staff/tasks/cards/<int:pk>/', TaskStatusUpdateView.as_view(), name='task-status-update'),
+    path('notifications/my/', get_my_notifications, name='my-notifications'),
+
     path('clients/tasks/', ClientOutOfScopeTasksView.as_view(), name='client-workspace-tasks'),
 ]

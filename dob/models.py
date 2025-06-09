@@ -233,12 +233,10 @@ class Task(models.Model):
         related_name='tasks'
     )
 
-    assigned_to = models.ForeignKey(
-        'StaffProfile',  # or 'StaffProfile' depending on your design
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='assigned_tasks'
+    assigned_staff = models.ManyToManyField(
+        'StaffProfile',
+        through='TaskAssignment',
+        related_name='tasks_participating_in'
     )
 
     flow_or_hours = models.CharField(  # This can be renamed based on your real need
@@ -263,7 +261,7 @@ class Task(models.Model):
         ],
         default='pending'
     )
-
+    
     due_date = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     raised_to_client = models.BooleanField(default=False)
@@ -290,10 +288,54 @@ class Task(models.Model):
     )
     raised_to_spoc = models.BooleanField(default=False)
     deadline = models.DateField(null=True, blank=True)
+    STATUS_CHOICES = [
+        ('backlog', 'Backlog'),
+        ('todo', 'TO-DO'),
+        ('processing', 'Processing'),
+        ('review', 'Review'),
+        ('done', 'Done'),
+    ]
 
+    task_status = models.CharField(
+        max_length=20,
+        
+        default='backlog',
+    )
     def __str__(self):
         return self.title
-    
+# models.py
+class TaskAssignment(models.Model):
+    task = models.ForeignKey(Task, on_delete=models.CASCADE)
+    staff_member = models.ForeignKey('StaffProfile', on_delete=models.CASCADE)
+    designation_at_assignment = models.CharField(max_length=100, blank=True) # e.g., "Developer", "Designer"
+    time_estimation = models.CharField(max_length=20, blank=True, null=True) # Or DurationField
+    member_deadline = models.DateField(null=True, blank=True)
+    STATUS_CHOICES = [
+        ('backlog', 'Backlog'),
+        ('todo', 'To Do'),
+        ('processing', 'Processing'),
+        ('review', 'Under Review'),
+        ('done', 'Done'),
+    ]
+    REVIEW_STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('redo', 'Redo Required'),
+        ('completed', 'Review Completed'),
+    ]
+    order = models.IntegerField(default=0)
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='backlog'  # default value
+    )
+    review_status = models.CharField(
+        max_length=20,
+        choices=REVIEW_STATUS_CHOICES,
+        default='pending'  # default value
+    )
+    # ... other assignment-specific fields
+
+
 class WorkItem(models.Model):
     title = models.CharField(max_length=100)
     current_step_index = models.IntegerField(default=0)
@@ -308,6 +350,7 @@ class WorkflowStep(models.Model):
         ('processing', 'Processing'),
         ('review', 'Under Review'),
         ('done', 'Done'),
+        
     ]
 
     REVIEW_STATUS_CHOICES = [
@@ -315,6 +358,7 @@ class WorkflowStep(models.Model):
         ('redo', 'Redo Required'),
         ('completed', 'Review Completed'),
     ]
+    
 
     work_item = models.ForeignKey(WorkItem, related_name='workflow_steps', on_delete=models.CASCADE)
     role = models.CharField(max_length=50)
@@ -325,3 +369,24 @@ class WorkflowStep(models.Model):
     review_status = models.CharField(max_length=20, choices=REVIEW_STATUS_CHOICES, null=True, blank=True)
 
     completed_at = models.DateTimeField(null=True, blank=True)
+
+class Notification(models.Model):
+    from_user = models.ForeignKey(
+        CustomUser,
+        on_delete=models.CASCADE,
+        related_name='sent_notifications'
+    )
+    to_users = models.ManyToManyField(
+        CustomUser,
+        related_name='received_notifications'
+    )
+    subject = models.CharField(max_length=255)
+    message = models.TextField()
+    is_read = models.BooleanField(default=False)  # Shared read status
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def str(self):
+        return f"{self.subject} | From: {self.from_user.username}"
+
+    class Meta:
+        ordering = ['-created_at']
