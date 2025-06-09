@@ -69,10 +69,12 @@ urlpatterns = [
     path('tasks/<int:pk>/raise-to-spoc/', RaiseToSPOCView.as_view(), name='raise-to-spoc'),
     path('tasks/raised-to-spoc/', RaisedToSPOCTasksView.as_view(), name='raised-to-spoc-tasks'),
     path('tasks/<int:task_id>/assign-staff/', AssignMultipleStaffToTaskView.as_view(), name='assign-staff-to-task'),
+    path('staff/tasks/<int:task_id>/progress/', TaskProgressView.as_view(), name='task-progress'),
 
     path('staff/tasks/cards/', get_spoc_tasks, name='staff-task-cards'),
     path('staff/tasks/cards/<int:pk>/', TaskStatusUpdateView.as_view(), name='task-status-update'),
     path('notifications/my/', get_my_notifications, name='my-notifications'),
-
+    path('my-task-assignments/', UserTaskAssignmentsView.as_view(), name='user-task-assignments'),
+    path('task-assignment/<int:task_id>/status/',TaskAssignmentStatusUpdateView.as_view(),name='task-assignment-status-update'),
     path('clients/tasks/', ClientOutOfScopeTasksView.as_view(), name='client-workspace-tasks'),
 ]

@@ -840,17 +840,61 @@ class TaskStatusUpdateView(APIView):
     def patch(self, request, pk):
         task = get_object_or_404(Task, pk=pk)
         new_status = request.data.get('task_status')
+
         print("PATCH payload:", request.data)
-        # Optional: Validate if the status is one of the allowed choices
+
         valid_statuses = [choice[0] for choice in Task._meta.get_field('task_status').choices]
         if new_status not in valid_statuses:
             return Response({"error": "Invalid task status."}, status=status.HTTP_400_BAD_REQUEST)
 
         task.task_status = new_status
+
+        # If task is marked as done, increment current_step by 1
+        if new_status.lower() == "done":
+            task.current_step_index+= 1
+
         task.save()
         serializer = TaskSerializer(task)
         return Response(serializer.data, status=status.HTTP_200_OK)
-    
+
+class TaskAssignmentStatusUpdateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, task_id):
+        # Get the logged-in user's ID
+        user_id = request.user.id
+
+        # Fetch TaskAssignment by task and staff member (using user_id)
+        task_assignment = get_object_or_404(
+            TaskAssignment, task_id=task_id, staff_member__user_id=user_id
+        )
+        new_status = request.data.get('status')
+
+        # Validate new_status against TaskAssignment.STATUS_CHOICES
+        valid_statuses = [choice[0] for choice in TaskAssignment._meta.get_field('status').choices]
+        if new_status not in valid_statuses:
+            return Response({"error": "Invalid assignment status."}, status=status.HTTP_400_BAD_REQUEST)
+
+        task_assignment.status = new_status
+
+        # If status is done, increment the current_step_index of related task by 1
+        if new_status.lower() == "done":
+            task = task_assignment.task
+            task.current_step_index += 1
+            task.save()
+
+        task_assignment.save()
+
+        data = {
+            "task_id": task_assignment.task.id,
+            "staff_member_id": task_assignment.staff_member.user.id,
+            "status": task_assignment.status,
+            "current_step_index": task_assignment.task.current_step_index,
+        }
+
+        return Response(data, status=status.HTTP_200_OK)
+
+
 class AssignStaffToTaskView(APIView):
     def patch(self, request, task_id):
         task = get_object_or_404(Task, id=task_id)
@@ -868,8 +912,8 @@ class AssignStaffToTaskView(APIView):
         return Response({'message': 'Staff assigned successfully.'}, status=status.HTTP_200_OK)
 
 class AssignMultipleStaffToTaskView(APIView):
-    permission_classes=[IsAuthenticated]
-    
+    permission_classes = [IsAuthenticated]
+
     def post(self, request, task_id):
         task = get_object_or_404(Task, id=task_id)
         assignments_data = request.data.get('assignments', [])
@@ -878,8 +922,15 @@ class AssignMultipleStaffToTaskView(APIView):
             return Response({'error': 'Provide a list of staff assignments.'}, status=status.HTTP_400_BAD_REQUEST)
 
         User = get_user_model()
+        assigned_user_ids = []
 
-        assigned_user_ids = []  # To collect user ids for notifications
+        # Predefined order mapping
+        role_order = {
+            'content_writer': 0,
+            'designer': 1,
+            'developer': 2,
+            'tester': 3
+        }
 
         for entry in assignments_data:
             staff_id = entry.get('staff_member_id')
@@ -887,30 +938,31 @@ class AssignMultipleStaffToTaskView(APIView):
                 continue
 
             staff = get_object_or_404(StaffProfile, user_id=staff_id)
+            designation = entry.get('designation_at_assignment', '').lower()
+            order_value = role_order.get(designation, 99)  # fallback order if designation unknown
 
             TaskAssignment.objects.update_or_create(
                 task=task,
                 staff_member=staff,
                 defaults={
-                    'designation_at_assignment': entry.get('designation_at_assignment', ''),
+                    'designation_at_assignment': designation,
                     'time_estimation': entry.get('time_estimation'),
                     'member_deadline': entry.get('member_deadline'),
+                    'order': order_value
                 }
             )
             assigned_user_ids.append(staff.user.id)
 
-        # Create notifications for assigned staff members
+        # Notify assigned users
         try:
             manager = ManagerProfile.objects.get()
         except ManagerProfile.DoesNotExist:
-            # If no manager, skip notification creation
             manager = None
         except ManagerProfile.MultipleObjectsReturned:
             manager = ManagerProfile.objects.first()
 
         if manager and assigned_user_ids:
             to_users = User.objects.filter(id__in=assigned_user_ids)
-
             notification = Notification.objects.create(
                 from_user=request.user,
                 subject=f"Task Assignment Updated: {task.title}",
@@ -919,7 +971,6 @@ class AssignMultipleStaffToTaskView(APIView):
             notification.to_users.set(to_users)
 
         return Response({'message': 'Staff assigned with metadata successfully.'}, status=status.HTTP_200_OK)
-
 
 class AssignStatusView(APIView):
     def post(self, request, task_id):
@@ -955,12 +1006,26 @@ class AssignSpocView(APIView):
         except (CustomUser.DoesNotExist, TeamLeadProfile.DoesNotExist):
             return Response({"error": "Team Lead not found"}, status=status.HTTP_404_NOT_FOUND)
 
-from django.utils.timezone import now
-from datetime import datetime
 
-from django.http import JsonResponse
-from django.utils.timezone import now
-from datetime import datetime
+class TaskProgressView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, task_id):
+        user_id = request.user.id
+
+        # Get the Task
+        task = get_object_or_404(Task, id=task_id)
+
+        # Get the TaskAssignment for this user and task
+        task_assignment = get_object_or_404(TaskAssignment, task=task, staff_member__user_id=user_id)
+
+        data = {
+            "task_id": task.id,
+            "current_step_index": task.current_step_index,
+            "assignment_order": task_assignment.order,
+        }
+
+        return Response(data, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
@@ -997,7 +1062,32 @@ def get_spoc_tasks(request):
 
     return JsonResponse(tasks_list, safe=False)
 
+class UserTaskAssignmentsView(APIView):
+    permission_classes = [IsAuthenticated]
 
+    def get(self, request):
+        try:
+            staff_profile = StaffProfile.objects.get(user=request.user)
+        except StaffProfile.DoesNotExist:
+            return Response({'error': 'Staff profile not found'}, status=404)
+
+        assignments = TaskAssignment.objects.filter(staff_member=staff_profile).select_related('task')
+
+        data = []
+        for assignment in assignments:
+            data.append({
+                "task_id": assignment.task.id,
+                "task_title": assignment.task.title,
+                "designation": assignment.designation_at_assignment,
+                "deadline": assignment.member_deadline,
+                "status": assignment.status,
+                "review_status": assignment.review_status,
+                "order": assignment.order,
+                "time_estimation": assignment.time_estimation,
+                "workspace": assignment.task.workspace.workspace_name if assignment.task.workspace else None,
+            })
+
+        return Response(data, status=200)
 
 class get_logged_in_client(APIView):
     permission_classes = [AllowAny]
